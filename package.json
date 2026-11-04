@@ -1,0 +1,25 @@
+{
+  "name": "blockchain-attack-simulator",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Interactive browser simulator for Proof-of-Work consensus and blockchain attacks (51%, double-spend, selfish mining).",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.4.0",
+    "@noble/secp256k1": "^3.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
+  }
+}
