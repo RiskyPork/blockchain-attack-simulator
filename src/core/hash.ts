@@ -1,7 +1,7 @@
 /**
  * Hash primitives used throughout the simulator.
  *
- * Bitcoin uses two hash constructions (Lec05):
+ * Bitcoin uses two hash constructions:
  *   - SHA-256 applied twice ("sha256d") for block hashes, transaction ids and
  *     Merkle tree nodes.
  *   - HASH160 = RIPEMD160(SHA256(x)) to shorten a public key into an address.
@@ -24,7 +24,7 @@ export function sha256d(data: Uint8Array): Uint8Array {
   return nobleSha256(nobleSha256(data));
 }
 
-/** Lec05: address payload = RIPEMD160(SHA256(pubkey)). */
+/** address payload = RIPEMD160(SHA256(pubkey)). */
 export function hash160(data: Uint8Array): Uint8Array {
   return ripemd160(nobleSha256(data));
 }

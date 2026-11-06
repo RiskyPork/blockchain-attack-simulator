@@ -1,5 +1,5 @@
 /**
- * Block header, its serialization and hash, and difficulty targets (Lec05).
+ * Block header, its serialization and hash, and difficulty targets.
  *
  * The header commits to the whole block:
  *   prevHash    links to the parent, forming the chain
@@ -13,6 +13,13 @@
  * target is stored as a full 32-byte number instead of the compact "nBits".
  */
 import { bytesToHex, hashToBigInt, sha256d } from './hash';
+import type { Transaction } from './transaction';
+
+/** A full block. txs[0] is the coinbase; header.merkleRoot = merkleRoot(txs.map(txid)). */
+export interface Block {
+  header: BlockHeader;
+  txs: Transaction[];
+}
 
 export const HASH_BYTES = 32;
 /** 32 + 32 + 8 + 32 + 4 bytes. */

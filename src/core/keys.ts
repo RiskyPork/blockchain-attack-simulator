@@ -1,5 +1,5 @@
 /**
- * Key pairs, ECDSA signatures and addresses (Lec05).
+ * Key pairs, ECDSA signatures and addresses.
  *
  * Bitcoin uses ECDSA over the secp256k1 curve:
  *   private key  = random 256-bit number
@@ -58,7 +58,7 @@ export function generateKeyPair(): KeyPair {
 /**
  * Sign a 32-byte digest (e.g. the sha256d transaction digest). prehash is off
  * because the caller has already hashed the message. Returns a 64-byte compact
- * (r ‖ s) signature with low-S, as Bitcoin requires since BIP 146.
+ * (r || s) signature with low-S, as Bitcoin requires since BIP 146.
  */
 export function signDigest(digest: Uint8Array, privateKey: Uint8Array): Uint8Array {
   if (digest.length !== 32) throw new Error('digest must be 32 bytes');

@@ -1,5 +1,5 @@
 /**
- * Merkle root of a block's transactions (Lec05).
+ * Merkle root of a block's transactions.
  *
  * The leaves are txids. Each level hashes adjacent pairs with sha256d; if a
  * level has an odd number of nodes, the last one is paired with itself
