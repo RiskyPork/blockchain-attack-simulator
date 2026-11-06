@@ -6,3 +6,4 @@ export * from './base58';
 export * from './keys';
 export * from './merkle';
 export * from './block';
+export * from './transaction';
