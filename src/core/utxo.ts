@@ -70,9 +70,17 @@ export class UtxoSet {
    * on error the set is left unchanged.
    */
   applyBlock(block: Block): BlockUndo {
+    return this.applyTransactions(block.txs);
+  }
+
+  /**
+   * applyBlock without the block wrapper, e.g. to apply the mempool on top of
+   * the confirmed set and see what a wallet can spend right now.
+   */
+  applyTransactions(txs: readonly Transaction[]): BlockUndo {
     const spent: Utxo[] = [];
     this.transact((change) => {
-      for (const tx of block.txs) {
+      for (const tx of txs) {
         for (const input of inputsOf(tx)) {
           spent.push(change.remove(input, 'input spends a missing or already-spent output'));
         }

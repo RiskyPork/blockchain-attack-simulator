@@ -9,3 +9,4 @@ export * from './block';
 export * from './transaction';
 export * from './miner';
 export * from './utxo';
+export * from './validation';
