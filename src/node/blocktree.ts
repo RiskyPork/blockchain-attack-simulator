@@ -1,11 +1,11 @@
 /**
- * Block tree (S2-2): every block a node has accepted, including stale ones,
+ * Block tree: every block a node has accepted, including stale ones,
  * plus an orphan pool.
  *
  * With network delay, two miners can find a block on the same parent before
  * either hears about the other's, so the chain forks. A node keeps every
  * branch, because the branch with less work today may overtake tomorrow.
- * Lec05 separates two kinds of off-chain block, which are easy to mix up:
+ * Two kinds of off-chain block are easy to mix up:
  *
  *   stale block   valid, parent known, but not on the main chain: it lost a
  *                 fork race and its miner earns nothing. It stays in the tree.
@@ -13,10 +13,8 @@
  *                 out of order), so it can't be placed in the tree. It waits in
  *                 the orphan pool and is connected when the parent arrives.
  *
- * (Many sources loosely call stale blocks "orphans"; this code follows Lec05.)
- *
  * The tree only tracks structure and cumulative work. Which branch is the main
- * chain, and full validation of a block's spends, are Chain's job (S2-3).
+ * chain, and full validation of a block's spends, are Chain's job.
  */
 import { type Block, type BlockError, ZERO_HASH, blockHashHex, blockWork, bytesToHex } from '../core';
 
@@ -108,11 +106,11 @@ export class BlockTree {
   }
 
   /**
-   * Fork choice (Nakamoto consensus, Lec05): the tip with the most cumulative
+   * Fork choice: the tip with the most cumulative
    * work. Height alone is wrong once difficulty varies, since a short chain of
    * hard blocks can hold more work than a long chain of easy ones. On a tie
    * the block seen first wins, as in Bitcoin Core, so a node doesn't flip
-   * between equal branches; selfish mining (S3-4) depends on this rule.
+   * between equal branches; selfish mining depends on this rule.
    */
   bestTip(): TreeEntry | undefined {
     let best: TreeEntry | undefined;

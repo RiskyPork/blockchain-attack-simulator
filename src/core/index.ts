@@ -1,5 +1,5 @@
 /**
- * core/: hashing, keys/addresses, transactions, blocks, Merkle root, UTXO set, validation. Pure functions, no UI or timing. Sprint 1.
+ * core/: hashing, keys/addresses, transactions, blocks, Merkle root, UTXO set, validation. Pure functions, no UI or timing.
  */
 export * from './hash';
 export * from './base58';

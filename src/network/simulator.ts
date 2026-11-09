@@ -1,5 +1,5 @@
 /**
- * Discrete-event simulation engine (Sprint 2, S2-1).
+ * Discrete-event simulation engine.
  *
  * The simulated network doesn't run in real time. Instead it keeps a queue of
  * future events ("miner 2 finds a block at t = 613.4", "block X reaches node 3

@@ -1,9 +1,9 @@
 /**
- * Peer-to-peer network (Sprint 2, S2-4): nodes, links with latency, and
+ * Peer-to-peer network: nodes, links with latency, and
  * flooding gossip of blocks, running on the discrete-event Simulator.
  *
  * Bitcoin has no central server. Each node only talks to a few peers, and a
- * new block spreads by gossip (Lec05): a node that accepts a block it hadn't
+ * new block spreads by gossip: a node that accepts a block it hadn't
  * seen before passes it on to all its peers except the one it came from. A
  * block it already knows is dropped and not passed on, so the flood stops by
  * itself once every node has the block.
@@ -26,9 +26,14 @@
  *     download, and is what lets a node join late or a partition heal.
  *   - Messages already on the wire still arrive if their link is removed.
  *     Messages to a node that has been removed are dropped.
+ *
+ * Blocks come from the mining engine (`mining`, see mining.ts), which shares
+ * this network's simulator: its block-found events and the block-arrive
+ * events here run on the same clock, from the same seeded Rng.
  */
 import { type Block, blockHashHex } from '../core';
 import { Chain, type SubmitBlockResult } from '../node';
+import { type BlockFound, Mining } from './mining';
 import { Simulator } from './simulator';
 
 export type NodeId = number;
@@ -44,8 +49,8 @@ export interface BlockArrive {
   readonly sentAt: number;
 }
 
-/** Every event the network schedules. Mining events join this union in S2-5. */
-export type NetEvent = BlockArrive;
+/** Every event the network schedules: block deliveries, and blocks found by the mining engine. */
+export type NetEvent = BlockArrive | BlockFound;
 
 export interface LinkOptions {
   /** Fixed one-way delay in simulated seconds. */
@@ -62,7 +67,7 @@ export interface Link {
   readonly jitter: number;
 }
 
-/** A block on the wire, for the network panel to animate along its link (S2-7). */
+/** A block on the wire, for the network panel to animate along its link. */
 export interface Delivery {
   readonly from: NodeId;
   readonly to: NodeId;
@@ -91,10 +96,14 @@ export interface NetworkOptions {
   genesis: Block;
   /** Keep every fired event in `sim.log` (for tests and replay). */
   recordLog?: boolean;
+  /** Mean seconds between blocks (default 600, as in Bitcoin). */
+  blockInterval?: number;
 }
 
 export class Network {
   readonly sim: Simulator<NetEvent>;
+  /** Who mines, with what hash power and strategy. Nothing is mined until a node is given hash power. */
+  readonly mining: Mining;
   private readonly genesis: Block;
   private readonly nodeMap = new Map<NodeId, NetworkNode>();
   /** Peers of each node, in the order the links were made. */
@@ -112,8 +121,9 @@ export class Network {
     this.sim = new Simulator<NetEvent>({
       seed: opts.seed,
       recordLog: opts.recordLog,
-      handler: (event) => this.onArrive(event),
+      handler: (event) => (event.type === 'block-arrive' ? this.onArrive(event) : this.mining.handle(event)),
     });
+    this.mining = new Mining(this, opts.blockInterval);
   }
 
   get stats(): Readonly<NetworkStats> {
@@ -134,9 +144,10 @@ export class Network {
     return id;
   }
 
-  /** Remove a node and its links. Blocks already on their way to it are dropped when they arrive. */
+  /** Remove a node, its links and its miner. Blocks already on their way to it are dropped when they arrive. */
   removeNode(id: NodeId): void {
     this.node(id);
+    this.mining.removeMiner(id);
     for (const peer of this.peerMap.get(id)!.keys()) this.peerMap.get(peer)!.delete(id);
     this.peerMap.delete(id);
     this.nodeMap.delete(id);

@@ -1,6 +1,6 @@
 /**
  * ui/: the app shell. Each tab maps to one feature area; panels are filled in
- * sprint by sprint (see docs/SPRINT_PLAN.md). UI code only reads simulator
+ * as features land. UI code only reads simulator
  * state and dispatches user actions; it holds no consensus logic.
  */
 import { mountExplorer } from './explorer';

@@ -85,7 +85,7 @@ describe('targets and PoW check', () => {
   });
 
   it('a brute-force nonce search finds a block that meets an easy target', () => {
-    // Not the S1-5 miner, just a check that the header + target pieces fit together.
+    // Not the miner, just a check that the header + target pieces fit together.
     const target = targetFromLeadingZeroBits(8);
     let h = header({ nonce: 0 });
     while (!meetsTarget(blockHash(h), target)) h = { ...h, nonce: h.nonce + 1 };

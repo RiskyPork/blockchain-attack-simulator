@@ -1,8 +1,8 @@
 /**
- * Base58 and Base58Check encoding (Lec05: Bitcoin addresses).
+ * Base58 and Base58Check encoding, as used for Bitcoin addresses.
  *
- * Base58 is base-64 minus the characters that are easy to misread
- * (0, O, I, l, +, /). Each leading zero byte becomes a leading '1', so the
+ * Base58 is the base-64 alphabet minus the six characters that are easy to
+ * misread (0, O, I, l, +, /). Each leading zero byte becomes a leading '1', so the
  * version byte 0x00 of a mainnet address is why addresses start with '1'.
  *
  * Base58Check appends a 4-byte checksum = first 4 bytes of sha256d(payload),

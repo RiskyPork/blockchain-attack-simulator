@@ -1,7 +1,7 @@
 /**
  * One node's view of the blockchain: a block tree holding every block it has
- * accepted (S2-2), the main chain chosen from it by most cumulative work
- * (S2-3), the UTXO set at the main chain's tip, and a mempool of transactions
+ * accepted, the main chain chosen from it by most cumulative work,
+ * the UTXO set at the main chain's tip, and a mempool of transactions
  * waiting to be mined.
  *
  * The rules stay in core/validation; this class only decides what to do with a
@@ -56,7 +56,7 @@ export type SubmitBlockResult =
   | { ok: true; status: 'main' | 'stale' | 'orphan'; tipChange: TipChange | null }
   | { ok: false; error: SubmitBlockError };
 
-/** Read-only view of the tree, e.g. for the chain tree view (S2-8). */
+/** Read-only view of the tree, e.g. for the chain tree view. */
 export type ReadonlyBlockTree = Pick<
   BlockTree,
   'size' | 'get' | 'has' | 'isOrphan' | 'invalidReason' | 'entries' | 'childrenOf' | 'tips' | 'orphans'
@@ -274,7 +274,7 @@ export class Chain {
    * candidate is re-checked in order against the new UTXO set. A tx the new
    * chain already confirmed, or one that conflicts with it, now fails and is
    * dropped. That is how a double spend wins: the attacker's chain confirms a
-   * conflicting tx, so the merchant's payment vanishes on the reorg (S3-2).
+   * conflicting tx, so the merchant's payment vanishes on the reorg.
    * Coinbase txs are dropped: their reward only exists on their own branch.
    */
   private rebuildMempool(disconnected: Block[]): void {

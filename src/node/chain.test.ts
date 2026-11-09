@@ -624,7 +624,7 @@ describe('Chain: returned values are copies', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Forks and reorgs (S2-2 block tree, S2-3 fork choice)
+// Forks and reorgs
 // ---------------------------------------------------------------------------
 
 let stamp = 100_000;

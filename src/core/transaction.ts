@@ -203,7 +203,7 @@ export type InputAuthError = 'wrong-public-key' | 'bad-signature';
  * Check that input `i` may spend `spentOutput`:
  *   1. HASH160(publicKey) matches the address the output is locked to, and
  *   2. the signature over txid(tx) verifies with that public key.
- * Looking up `spentOutput` in the UTXO set is the caller's job (S1-6/S1-7).
+ * Looking up `spentOutput` in the UTXO set is the caller's job.
  */
 export function checkInputAuthorization(tx: StandardTx, i: number, spentOutput: TxOutput): InputAuthError | null {
   const input = tx.inputs[i];
