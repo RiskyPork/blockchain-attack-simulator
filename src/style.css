@@ -10,6 +10,12 @@
   --bad: #b91c1c;
   --bad-bg: #fef2f2;
   --info-bg: #f1f1ef;
+  --on-accent: #ffffff;
+  --main-bg: #fff3eb;
+  --other: #2563eb;
+  --other-bg: #eef3ff;
+  --stale: #a1a1aa;
+  --stale-bg: #f1f1ef;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
 }
@@ -27,6 +33,12 @@
     --bad: #f87171;
     --bad-bg: #2a1515;
     --info-bg: #26262a;
+    --on-accent: #1d1d20;
+    --main-bg: #33211a;
+    --other: #60a5fa;
+    --other-bg: #172033;
+    --stale: #6b6b72;
+    --stale-bg: #222225;
   }
 }
 
@@ -378,30 +390,40 @@ code.wrap {
   color: var(--bad);
 }
 
-.wallets-scroll {
+.wallets-scroll,
+.table-scroll {
   overflow-x: auto;
 }
 
-table.wallets {
+table.wallets,
+table.data {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
 }
 
 table.wallets th,
-table.wallets td {
+table.wallets td,
+table.data th,
+table.data td {
   text-align: left;
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 
-table.wallets th {
+table.data td {
+  vertical-align: middle;
+}
+
+table.wallets th,
+table.data th {
   color: var(--muted);
   font-weight: 500;
 }
 
-table.wallets .num {
+table.wallets .num,
+table.data .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -414,4 +436,399 @@ table.wallets .num {
   border-radius: 4px;
   background: var(--info-bg);
   font-variant-numeric: tabular-nums;
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.swatch {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: 5px;
+  border-radius: 2px;
+}
+
+button.icon {
+  padding: 2px 8px;
+}
+
+/* ---- Live network: transport bar ------------------------------- */
+
+.transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+}
+
+.transport label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.transport [data-ref='play'] {
+  min-width: 6.5em;
+}
+
+.transport .clock {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.last-event {
+  min-height: 1.5em;
+  margin: 8px 0 12px;
+  font-size: 0.9rem;
+}
+
+/* ---- Network tab ----------------------------------------------- */
+
+.net-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .net-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.net-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.net-graph .link {
+  stroke: var(--border);
+  stroke-width: 3;
+}
+
+.net-graph .body {
+  fill: var(--surface);
+  stroke-width: 6;
+}
+
+.net-graph .halo {
+  fill: none;
+  stroke-width: 6;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.net-graph .halo.pulse {
+  animation: found-pulse 0.9s ease-out;
+}
+
+@keyframes found-pulse {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .net-graph .halo.pulse {
+    animation: none;
+  }
+}
+
+.net-graph .label {
+  fill: var(--text);
+  font: 600 12px var(--font);
+  text-anchor: middle;
+}
+
+.net-graph .height {
+  fill: var(--muted);
+  font: 11px var(--font);
+  text-anchor: middle;
+}
+
+.net-graph .packet {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.net-side .slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.net-side .slider output {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.net-side input[type='range'],
+table.data input[type='range'] {
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.net-side input[type='range'] {
+  width: 100%;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 12px 0 0;
+  font-size: 0.9rem;
+}
+
+.stats dt {
+  color: var(--muted);
+}
+
+.stats dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+table.data td.hp {
+  white-space: nowrap;
+}
+
+table.data td.hp input {
+  width: 9em;
+  vertical-align: middle;
+}
+
+table.data output {
+  display: inline-block;
+  min-width: 2em;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}
+
+.activity li {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.activity li.reorg {
+  background: var(--other-bg);
+}
+
+.activity .when {
+  display: inline-block;
+  min-width: 5.5em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Chain tree tab -------------------------------------------- */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend .key {
+  width: 22px;
+  height: 14px;
+  border: 2px solid;
+  border-radius: 4px;
+}
+
+.legend .key.main {
+  background: var(--main-bg);
+  border-color: var(--accent);
+}
+
+.legend .key.main.final {
+  background: var(--accent);
+}
+
+.legend .key.other {
+  background: var(--other-bg);
+  border-color: var(--other);
+  border-style: dashed;
+}
+
+.legend .key.stale {
+  background: var(--stale-bg);
+  border-color: var(--stale);
+}
+
+.legend .tip-key {
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.tree-scroll {
+  overflow-x: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.chain-tree {
+  display: block;
+}
+
+.chain-tree .tb {
+  cursor: pointer;
+}
+
+.chain-tree .tb:focus {
+  outline: none;
+}
+
+.chain-tree .tb rect {
+  stroke-width: 2;
+}
+
+.chain-tree .tb .h {
+  fill: var(--text);
+  font: 600 12px var(--font);
+}
+
+.chain-tree .tb.main rect {
+  fill: var(--main-bg);
+  stroke: var(--accent);
+}
+
+.chain-tree .tb.main.final rect {
+  fill: var(--accent);
+}
+
+.chain-tree .tb.main.final .h {
+  fill: var(--on-accent);
+}
+
+.chain-tree .tb.other rect {
+  fill: var(--other-bg);
+  stroke: var(--other);
+  stroke-dasharray: 4 3;
+}
+
+.chain-tree .tb.stale rect {
+  fill: var(--stale-bg);
+  stroke: var(--stale);
+}
+
+.chain-tree .tb.stale .h {
+  fill: var(--muted);
+}
+
+.chain-tree .tb.selected rect,
+.chain-tree .tb:focus-visible rect {
+  stroke: var(--text);
+  stroke-width: 3;
+}
+
+.chain-tree .dot {
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+
+.chain-tree .tip-mark {
+  fill: var(--text);
+  font: 600 10px var(--font);
+}
+
+.chain-tree .edge {
+  fill: none;
+  stroke-width: 2;
+}
+
+.chain-tree .edge.main {
+  stroke: var(--accent);
+}
+
+.chain-tree .edge.other {
+  stroke: var(--other);
+  stroke-dasharray: 4 3;
+}
+
+.chain-tree .edge.stale {
+  stroke: var(--stale);
+}
+
+.chain-tree .final-line {
+  stroke: var(--good);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.chain-tree .final-label {
+  fill: var(--good);
+  font: 600 11px var(--font);
+}
+
+.chain-tree .pending-label {
+  fill: var(--muted);
+  font: 11px var(--font);
+}
+
+.pill {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 8px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.pill.main {
+  color: var(--accent);
+}
+
+.pill.main.final {
+  background: var(--good-bg);
+  color: var(--good);
+}
+
+.pill.other {
+  color: var(--other);
+}
+
+.pill.stale {
+  color: var(--muted);
 }

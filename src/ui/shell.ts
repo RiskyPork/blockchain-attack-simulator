@@ -3,7 +3,9 @@
  * as features land. UI code only reads simulator
  * state and dispatches user actions; it holds no consensus logic.
  */
+import { mountChainTree } from './chaintree';
 import { mountExplorer } from './explorer';
+import { mountNetwork } from './network';
 import { App } from './state';
 import { mountWallets } from './wallets';
 
@@ -18,8 +20,8 @@ interface Tab {
 const TABS: Tab[] = [
   { id: 'wallets', label: 'Wallets', sprint: 1, blurb: 'secp256k1 key pairs, Base58Check addresses, signed transactions.', mount: mountWallets },
   { id: 'explorer', label: 'Explorer', sprint: 1, blurb: 'Blocks, transactions, Merkle roots and real SHA-256 proof-of-work.', mount: mountExplorer },
-  { id: 'network', label: 'Network', sprint: 2, blurb: 'Nodes, hash power, link latency and block propagation.' },
-  { id: 'chain', label: 'Chain tree', sprint: 2, blurb: 'Every block including stale forks; the most-work chain is highlighted.' },
+  { id: 'network', label: 'Network', sprint: 2, blurb: 'Nodes, hash power, link latency and block propagation.', mount: mountNetwork },
+  { id: 'chain', label: 'Chain tree', sprint: 2, blurb: 'Every block including stale forks; the most-work chain is highlighted.', mount: mountChainTree },
   { id: 'attacks', label: 'Attacks', sprint: 3, blurb: '51% / double-spend and selfish mining, live.' },
   { id: 'experiments', label: 'Experiments', sprint: 4, blurb: 'Batch trials: simulated success rate vs. theory.' },
 ];
@@ -49,7 +51,12 @@ export function mountShell(root: HTMLElement): void {
   const buttons = root.querySelectorAll<HTMLButtonElement>('[data-tab]');
   const show = (id: string): void => {
     buttons.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
-    root.querySelectorAll<HTMLElement>('[role="tabpanel"]').forEach((p) => (p.hidden = p.id !== `panel-${id}`));
+    root.querySelectorAll<HTMLElement>('[role="tabpanel"]').forEach((p) => {
+      const wasHidden = p.hidden;
+      p.hidden = p.id !== `panel-${id}`;
+      // Panels that skip drawing while hidden catch up on this event.
+      if (wasHidden && !p.hidden) p.dispatchEvent(new Event('show'));
+    });
   };
   buttons.forEach((b) => b.addEventListener('click', () => show(b.dataset.tab!)));
 }

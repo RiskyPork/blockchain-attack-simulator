@@ -51,6 +51,25 @@ export function fmtMs(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`;
 }
 
+/** Simulated seconds as "42.0 s", "12m 05s" or "1h 02m 03s". */
+export function fmtSimTime(seconds: number): string {
+  if (seconds < 60) return `${seconds.toFixed(1)} s`;
+  const t = Math.floor(seconds);
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = String(t % 60).padStart(2, '0');
+  return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m ${s}s` : `${m}m ${s}s`;
+}
+
+/**
+ * A colour for a block, taken from the end of its hash (the start is mostly
+ * zeros under real PoW). The network graph paints each node with its tip's
+ * colour, so nodes that agree share a colour and a fork shows up as two.
+ */
+export function blockColor(hash: string): string {
+  return `hsl(${parseInt(hash.slice(-4), 16) % 360} 70% 50%)`;
+}
+
 /** A coloured result box. `text` is escaped. */
 export function banner(kind: 'ok' | 'error' | 'info', text: string): string {
   return `<div class="banner ${kind}">${esc(text)}</div>`;
