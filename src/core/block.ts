@@ -84,7 +84,7 @@ export function targetFromLeadingZeroBits(bits: number): bigint {
 
 /**
  * Expected number of hashes needed to meet `target`: 2^256 / (target + 1).
- * Fork choice (Sprint 2) sums this along a chain to pick the most-work tip.
+ * Fork choice sums this along a chain to pick the most-work tip.
  */
 export function blockWork(target: bigint): bigint {
   return TWO_256 / (target + 1n);

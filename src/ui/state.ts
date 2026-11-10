@@ -1,9 +1,12 @@
 /**
  * UI-side application state: the node, the user's wallets and display-only
  * extras (mining stats). Panels read it and re-render when it changes.
+ * The multi-node network has its own state and change events (playground.ts),
+ * since it changes every animation frame while it runs.
  */
 import { type Address, type KeyPair, generateKeyPair, targetFromLeadingZeroBits } from '../core';
 import { Chain } from '../node';
+import { Playground } from './playground';
 
 export interface NamedWallet {
   name: string;
@@ -24,6 +27,8 @@ export class App {
   readonly wallets: NamedWallet[] = [];
   /** Keyed by block hash hex. */
   readonly miningStats = new Map<string, MiningStats>();
+  /** The live multi-node network shown on the Network and Chain tree tabs. */
+  readonly playground = new Playground();
   private readonly listeners = new Set<() => void>();
 
   onChange(fn: () => void): void {

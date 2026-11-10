@@ -9,7 +9,7 @@
  * Each function returns the first rule that fails, as a typed error the UI
  * can explain, and never throws on malformed data.
  */
-import { type Block, blockHash, meetsTarget, serializeHeader } from './block';
+import { type Block, type BlockHeader, blockHash, meetsTarget, serializeHeader } from './block';
 import { isValidAddress } from './keys';
 import { merkleRoot } from './merkle';
 import { BLOCK_SUBSIDY } from './miner';
@@ -139,32 +139,54 @@ function checkSpends(tx: StandardTx, lookup: Lookup): TxResult {
 // Blocks
 // ---------------------------------------------------------------------------
 
-export function validateBlock(block: Block, ctx: BlockContext): BlockResult {
-  const { header, txs } = block;
-
-  // Header: well-formed, extends the expected parent, uses the network target, has real PoW.
+/**
+ * Header-only rules: well-formed, uses the network's target, has real PoW.
+ * They need nothing but the header, so a node runs them on every block it
+ * receives before storing it anywhere, even in the orphan pool: a block
+ * without valid PoW is never worth keeping.
+ */
+export function checkHeader(header: BlockHeader, target: bigint): BlockError | null {
+  let hash: Uint8Array;
   try {
-    serializeHeader(header);
+    hash = blockHash(header);
   } catch {
-    return failBlock({ code: 'malformed-header' });
+    return { code: 'malformed-header' };
   }
-  if (!sameBytes(header.prevHash, ctx.parentHash)) return failBlock({ code: 'unknown-parent' });
-  if (header.target !== ctx.target) return failBlock({ code: 'wrong-target' });
-  if (!meetsTarget(blockHash(header), header.target)) return failBlock({ code: 'bad-pow' });
+  if (header.target !== target) return { code: 'wrong-target' };
+  if (!meetsTarget(hash, header.target)) return { code: 'bad-pow' };
+  return null;
+}
+
+/**
+ * Every block rule that doesn't need the UTXO set: checkHeader, then one
+ * coinbase committing to `height`, well-formed txs and a matching Merkle root.
+ * A node runs this on a side-branch block it stores but doesn't apply yet;
+ * the spends are checked by validateBlock if that branch ever becomes the main chain.
+ */
+export function checkBlockStructure(block: Block, ctx: { height: number; target: bigint }): BlockError | null {
+  const r = checkStructure(block, ctx);
+  return 'error' in r ? r.error : null;
+}
+
+/** checkBlockStructure, also returning the txids so validateBlock doesn't hash every tx twice. */
+function checkStructure(block: Block, ctx: { height: number; target: bigint }): { error: BlockError } | { ids: Uint8Array[] } {
+  const { header, txs } = block;
+  const headerError = checkHeader(header, ctx.target);
+  if (headerError) return { error: headerError };
 
   // Exactly one coinbase, first, committing to this height.
-  if (txs.length === 0) return failBlock({ code: 'no-transactions' });
+  if (txs.length === 0) return { error: { code: 'no-transactions' } };
   const coinbase = txs[0];
-  if (!isCoinbase(coinbase)) return failBlock({ code: 'first-tx-not-coinbase' });
+  if (!isCoinbase(coinbase)) return { error: { code: 'first-tx-not-coinbase' } };
   const extra = txs.findIndex((tx, i) => i > 0 && isCoinbase(tx));
-  if (extra !== -1) return failBlock({ code: 'multiple-coinbase', index: extra });
+  if (extra !== -1) return { error: { code: 'multiple-coinbase', index: extra } };
   if (coinbase.height !== ctx.height) {
-    return failBlock({ code: 'bad-coinbase-height', expected: ctx.height, actual: coinbase.height });
+    return { error: { code: 'bad-coinbase-height', expected: ctx.height, actual: coinbase.height } };
   }
 
   for (let i = 0; i < txs.length; i++) {
     const error = checkTxStructure(txs[i]);
-    if (error) return failBlock({ code: 'invalid-tx', index: i, error });
+    if (error) return { error: { code: 'invalid-tx', index: i, error } };
   }
 
   // The header must commit to exactly these transactions.
@@ -172,9 +194,26 @@ export function validateBlock(block: Block, ctx: BlockContext): BlockResult {
   try {
     ids = txs.map(txid);
   } catch {
-    return failBlock({ code: 'bad-merkle-root' }); // a tx that can't be hashed can't match any root
+    return { error: { code: 'bad-merkle-root' } }; // a tx that can't be hashed can't match any root
   }
-  if (!sameBytes(header.merkleRoot, merkleRoot(ids))) return failBlock({ code: 'bad-merkle-root' });
+  if (!sameBytes(header.merkleRoot, merkleRoot(ids))) return { error: { code: 'bad-merkle-root' } };
+  return { ids };
+}
+
+export function validateBlock(block: Block, ctx: BlockContext): BlockResult {
+  const { header, txs } = block;
+
+  // Header: well-formed and extends the expected parent; then everything checkBlockStructure checks.
+  try {
+    serializeHeader(header);
+  } catch {
+    return failBlock({ code: 'malformed-header' });
+  }
+  if (!sameBytes(header.prevHash, ctx.parentHash)) return failBlock({ code: 'unknown-parent' });
+  const structure = checkStructure(block, ctx);
+  if ('error' in structure) return failBlock(structure.error);
+  const { ids } = structure;
+  const coinbase = txs[0];
 
   // Spends, tx by tx. A view on top of ctx.utxos (which stays untouched):
   // outputs created by earlier txs in this block, minus outpoints they spent.

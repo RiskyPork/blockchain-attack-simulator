@@ -14,6 +14,7 @@ import {
   txid,
   txidHex,
 } from '../core';
+import { describeSubmitBlockError } from '../node';
 import { DEMOS, type DemoOutcome } from './demos';
 import { banner, esc, fmtCoins, fmtInt, fmtMs, hashHtml, hex, leadingZeroBits, shortHex } from './format';
 import { type App, DEFAULT_DIFFICULTY_BITS } from './state';
@@ -112,12 +113,14 @@ export function mountExplorer(root: HTMLElement, app: App): void {
       const { block, attempts } = await mineBlock(template, { signal: controller.signal, onProgress: p.onProgress });
       const ms = performance.now() - p.start;
       const result = app.chain.submitBlock(block);
-      if (result.ok) {
+      if (result.ok && result.status === 'main') {
         app.miningStats.set(hex(blockHash(block.header)), { attempts, ms });
         selectedHeight = app.chain.height;
         status.innerHTML = `Found a valid nonce after <strong>${fmtInt(attempts)}</strong> attempts in ${fmtMs(ms)}. Block #${app.chain.height} added; ${esc(wallet.name)} earned ${fmtCoins(block.txs[0].outputs[0].value)} coins.`;
+      } else if (result.ok) {
+        status.textContent = 'The chain changed while mining, so the block was stored off the main chain (stale). Try again.';
       } else {
-        status.textContent = 'The mined block was rejected (the chain changed while mining). Try again.';
+        status.textContent = `The mined block was rejected: ${describeSubmitBlockError(result.error)}`;
       }
     } catch (e) {
       status.textContent = isAbort(e) ? 'Mining cancelled.' : `Mining failed: ${String(e)}`;
