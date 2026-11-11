@@ -100,6 +100,11 @@ export class Chain {
     return tip ? hexToBytes(tip.hash) : ZERO_HASH;
   }
 
+  /** Cumulative work of the main chain, genesis to tip: the number fork choice compares. 0 before genesis. */
+  get chainWork(): bigint {
+    return this.main.at(-1)?.chainWork ?? 0n;
+  }
+
   /** The main chain's blocks, genesis first. */
   get blocks(): readonly Block[] {
     return this.main.map((e) => e.block);

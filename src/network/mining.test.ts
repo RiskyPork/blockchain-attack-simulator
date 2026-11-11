@@ -3,7 +3,9 @@ import { type Block, ZERO_HASH, blockHash, blockHashHex, meetsTarget, targetFrom
 import { hexToBytes } from '../core/hash';
 import { type KeyPair, keyPairFromPrivate } from '../core/keys';
 import { assembleBlock, mineChunk } from '../core/miner';
-import { type MinerContext, type MinerStrategy, SIMULATED_POW_TARGET } from './mining';
+import { COIN, txidHex } from '../core/transaction';
+import { buildPayment } from '../node/wallet';
+import { type AcceptedBlock, type MinerContext, type MinerStrategy, SIMULATED_POW_TARGET } from './mining';
 import { Network } from './network';
 
 // ---------------------------------------------------------------------------
@@ -330,5 +332,93 @@ describe('Mining: reproducibility (S2-5)', () => {
     expect(a.length).toBeGreaterThan(50);
     expect(run(7)).toEqual(a);
     expect(run(8)).not.toEqual(a);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Strategy hooks
+// ---------------------------------------------------------------------------
+
+describe('Mining: strategy hooks (S3-1)', () => {
+  /** With simulated PoW the first nonce always works. */
+  const solved = (t: Block): Block => ({ header: mineChunk(t.header, 1).header, txs: t.txs });
+
+  /** Mines on its tip like onTip, and records each block its node receives from a peer. */
+  function watcher(n: number) {
+    const received: { hash: string; status: AcceptedBlock['status']; timestamp: number }[] = [];
+    const strategy: MinerStrategy = {
+      ...onTip(n),
+      onBlockReceived: (ctx, block, result) =>
+        void received.push({ hash: blockHashHex(block.header), status: result.status, timestamp: ctx.timestamp }),
+    };
+    return { strategy, received };
+  }
+
+  it('tells each miner about every block a peer delivers, once, on arrival, and never about its own', () => {
+    const { net, ids } = makeNet(3, { blockInterval: 10 });
+    // A triangle: every block reaches each other node twice, first straight from its finder.
+    net.connect(ids[0], ids[1], { latency: 1 });
+    net.connect(ids[1], ids[2], { latency: 1 });
+    net.connect(ids[0], ids[2], { latency: 1 });
+    const watchers = ids.map((id, i) => {
+      const w = watcher(i + 1);
+      net.mining.setMiner(id, w.strategy, 1);
+      return w;
+    });
+    runBlocks(net, 30);
+    for (const id of ids) net.mining.setHashPower(id, 0);
+    drain(net);
+
+    const records = net.mining.minedBlocks();
+    ids.forEach((id, i) => {
+      const expected = records
+        .filter((r) => r.miner !== id)
+        .map((r) => ({ hash: r.hash, timestamp: Math.round((r.foundAt + 1) * 1000) }));
+      const got = watchers[i].received.map(({ hash, timestamp }) => ({ hash, timestamp }));
+      expect(got).toEqual(expected);
+    });
+  });
+
+  it('says where the block landed: main chain, side branch or orphan pool', () => {
+    const { net, ids } = makeNet(2);
+    const [a, b] = ids;
+    net.connect(a, b, { latency: 1 });
+    const w = watcher(2);
+    net.mining.setMiner(b, w.strategy, 0);
+    const chainA = net.node(a).chain;
+
+    const x = solved(chainA.createBlockTemplate(keyN(1).address, 1));
+    const y = solved(chainA.createBlockTemplate(keyN(3).address, 2)); // also on genesis: x's competitor
+    net.publish(a, x);
+    net.publish(a, y);
+    const hidden = solved(chainA.createBlockTemplate(keyN(1).address, 3)); // on x, kept by node a
+    chainA.submitBlock(hidden);
+    const z = solved(chainA.createBlockTemplate(keyN(1).address, 4)); // on hidden, which b never gets
+    net.publish(a, z);
+    drain(net);
+
+    expect(w.received.map((r) => r.status)).toEqual(['main', 'stale', 'orphan']);
+    expect(net.node(b).chain.tree.isOrphan(blockHashHex(z.header))).toBe(true);
+  });
+
+  it('gives code outside the hooks the same view and actions, as of now', () => {
+    const { net, ids } = makeNet(2);
+    const [a, b] = ids;
+    net.connect(a, b, { latency: 1 });
+    net.sim.runUntil(12.3456);
+    const ctx = net.mining.nodeContext(a);
+    expect(ctx.id).toBe(a);
+    expect(ctx.chain).toBe(net.node(a).chain);
+    expect(ctx.timestamp).toBe(12_346);
+
+    // keyN(999) owns the genesis coinbase.
+    const tx = buildPayment(ctx.chain.confirmedUtxos(), keyN(999), keyN(1).address, COIN, 1_000);
+    expect(ctx.broadcastTransaction(tx)).toEqual({ ok: true, fee: 1_000 });
+    expect(net.node(b).chain.mempool.map(txidHex)).toEqual([txidHex(tx)]);
+
+    expect(ctx.publish(solved(ctx.chain.createBlockTemplate(keyN(1).address, ctx.timestamp))).ok).toBe(true);
+    drain(net);
+    expect(net.node(b).chain.height).toBe(1);
+    expect(net.node(b).chain.txConfirmations(txidHex(tx))).toBe(1);
   });
 });

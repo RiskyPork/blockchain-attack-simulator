@@ -34,7 +34,7 @@
  * seconds on average when miners join or leave. Hash power is therefore
  * relative, and only each miner's share of the total matters.
  */
-import { type Block, blockHashHex, mineChunk, targetFromLeadingZeroBits } from '../core';
+import { type Block, type Transaction, type TxResult, blockHashHex, mineChunk, targetFromLeadingZeroBits } from '../core';
 import type { Chain, SubmitBlockResult } from '../node';
 import type { Network, NodeId } from './network';
 import type { EventId } from './simulator';
@@ -62,33 +62,51 @@ export interface MinedBlock {
   readonly pow: 'real' | 'simulated';
 }
 
-/** What a strategy sees, and can do, when its miner wins a block. */
-export interface MinerContext {
+/** What a strategy sees, and can do, through its node at the current moment. */
+export interface NodeContext {
   /** The node this miner runs on. */
   readonly id: NodeId;
   /** That node's view of the blockchain: the main chain's tip, the mempool, the UTXO set. */
   readonly chain: Chain;
-  /** Simulated time in integer milliseconds, for the block header. */
+  /** Simulated time in integer milliseconds, for a block header. */
   readonly timestamp: number;
-  /** The PoW step: find a nonce for this candidate block, and record this miner as its finder. */
-  solve(template: Block): Block;
-  /** Hand the block to this node's chain and gossip it to every peer. */
+  /** Hand a block to this node's chain and gossip it to every peer. */
   publish(block: Block): SubmitBlockResult;
+  /** Put a transaction in every node's mempool. Returns this node's verdict; a tx it rejects goes nowhere. */
+  broadcastTransaction(tx: Transaction): TxResult;
 }
+
+/** What a strategy can also do when its miner wins a block: the PoW step. */
+export interface MinerContext extends NodeContext {
+  /** Find a nonce for this candidate block, and record this miner as its finder. */
+  solve(template: Block): Block;
+}
+
+/** A block the node accepted, with where it ended up: main chain, side branch or orphan pool. */
+export type AcceptedBlock = Extract<SubmitBlockResult, { ok: true }>;
 
 /**
  * How a miner behaves. The engine only decides who wins each block; the
- * strategy decides what to build on and whether to publish. The honest miner
- * (strategies/honest.ts) is one. Attacker strategies plug in the same way,
- * and an onBlockReceived hook lets them react to other blocks.
+ * strategy decides what to build on and whether to publish.
+ *
+ * The honest miner (strategies/honest.ts) only needs onBlockFound. An attacker
+ * also implements onBlockReceived, since what it does next depends on the
+ * blocks the rest of the network finds: release a withheld branch once it is
+ * ahead, or give up once it has fallen too far behind.
  */
 export interface MinerStrategy {
   /** This miner has won the lottery for the next block. */
   onBlockFound(ctx: MinerContext): void;
+  /**
+   * A block from a peer reached this miner's node, which accepted it and has
+   * already relayed it. Not called for duplicates, rejected blocks, or blocks
+   * this node published itself.
+   */
+  onBlockReceived?(ctx: NodeContext, block: Block, result: AcceptedBlock): void;
 }
 
 /** The parts of Network the engine uses. */
-export type MiningHost = Pick<Network, 'sim' | 'node' | 'publish'>;
+export type MiningHost = Pick<Network, 'sim' | 'node' | 'publish' | 'broadcastTransaction'>;
 
 interface Miner {
   strategy: MinerStrategy;
@@ -187,9 +205,28 @@ export class Mining {
   handle(e: BlockFound): void {
     this.pending = null;
     // The miner is always still there: removing it, or changing its power, redraws the pending event.
-    this.miners.get(e.miner)?.strategy.onBlockFound(this.contextFor(e.miner));
+    this.miners.get(e.miner)?.strategy.onBlockFound(this.minerContext(e.miner));
     // Draw the next block, unless the strategy changed some hash power and so already did.
     if (this.pending === null) this.reschedule();
+  }
+
+  /** Called by the network when node `id` accepts a block from a peer. Passes it on to that node's strategy, if it has one. */
+  blockReceived(id: NodeId, block: Block, result: AcceptedBlock): void {
+    this.miners.get(id)?.strategy.onBlockReceived?.(this.nodeContext(id), block, result);
+  }
+
+  /**
+   * Node `id`'s view and actions as of now. The hooks get one of these; code
+   * outside them uses it too, e.g. to launch an attack at a moment the user picks.
+   */
+  nodeContext(id: NodeId): NodeContext {
+    return {
+      id,
+      chain: this.host.node(id).chain,
+      timestamp: Math.round(this.host.sim.now * 1000),
+      publish: (block) => this.host.publish(id, block),
+      broadcastTransaction: (tx) => this.host.broadcastTransaction(id, tx),
+    };
   }
 
   /** Cancel the pending draw and draw the next block afresh from now (exact, since the process is memoryless). */
@@ -220,15 +257,9 @@ export class Mining {
     return last; // only reached if floating-point rounding pushes the point past the end
   }
 
-  private contextFor(id: NodeId): MinerContext {
+  private minerContext(id: NodeId): MinerContext {
     const now = this.host.sim.now;
-    return {
-      id,
-      chain: this.host.node(id).chain,
-      timestamp: Math.round(now * 1000),
-      solve: (template) => this.solve(id, template, now),
-      publish: (block) => this.host.publish(id, block),
-    };
+    return { ...this.nodeContext(id), solve: (template) => this.solve(id, template, now) };
   }
 
   private solve(id: NodeId, template: Block, now: number): Block {

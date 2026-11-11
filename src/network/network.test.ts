@@ -3,7 +3,9 @@ import { type Block, type BlockHeader, ZERO_HASH, blockHashHex, targetFromLeadin
 import { hexToBytes } from '../core/hash';
 import { type KeyPair, keyPairFromPrivate } from '../core/keys';
 import { assembleBlock, mineChunk } from '../core/miner';
+import { COIN, txidHex } from '../core/transaction';
 import type { Chain } from '../node/chain';
+import { buildPayment } from '../node/wallet';
 import { type BlockArrive, Network } from './network';
 
 // ---------------------------------------------------------------------------
@@ -378,5 +380,42 @@ describe('Network reproducibility', () => {
 
   it('gives different arrival times for a different seed', () => {
     expect(run(43).log).not.toEqual(run(42).log);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Transactions
+// ---------------------------------------------------------------------------
+
+describe('Network transactions (S3-1)', () => {
+  /** minerA owns the genesis coinbase, its only coin. */
+  const payFromA = (net: Network, to: KeyPair, amount = COIN) =>
+    buildPayment(net.node(0).chain.confirmedUtxos(), minerA, to.address, amount, 1_000);
+
+  it("puts a broadcast tx in every node's mempool at once, linked or not", () => {
+    const { net, ids } = makeNetwork(3);
+    net.connect(ids[0], ids[1], { latency: 50 }); // node 2 has no links at all
+    const tx = payFromA(net, minerB);
+    expect(net.broadcastTransaction(ids[0], tx)).toEqual({ ok: true, fee: 1_000 });
+    for (const id of ids) expect(net.node(id).chain.mempool.map(txidHex)).toEqual([txidHex(tx)]);
+    expect(net.sim.pending).toBe(0); // nothing went on the wire
+    expect(net.stats.sent).toBe(0);
+  });
+
+  it("sends nothing when the origin's own node rejects the tx", () => {
+    const { net, ids } = makeNetwork(2);
+    net.connect(ids[0], ids[1], { latency: 1 });
+    const overspend = payFromA(net, minerB, 60 * COIN);
+    expect(net.broadcastTransaction(ids[0], overspend).ok).toBe(false);
+    for (const id of ids) expect(net.node(id).chain.mempool).toHaveLength(0);
+  });
+
+  it('first seen wins: a second tx spending the same coin is rejected everywhere', () => {
+    const { net, ids } = makeNetwork(3);
+    const first = payFromA(net, minerB);
+    const second = payFromA(net, keyN(3));
+    expect(net.broadcastTransaction(ids[0], first).ok).toBe(true);
+    expect(net.broadcastTransaction(ids[2], second)).toEqual({ ok: false, error: { code: 'missing-input', input: 0 } });
+    for (const id of ids) expect(net.node(id).chain.mempool.map(txidHex)).toEqual([txidHex(first)]);
   });
 });

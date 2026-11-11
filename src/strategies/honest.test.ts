@@ -45,6 +45,7 @@ function contextOn(chain: Chain, timestamp: number) {
       published.push(block);
       return chain.submitBlock(block);
     },
+    broadcastTransaction: (tx) => chain.submitTransaction(tx),
   };
   return { ctx, published };
 }

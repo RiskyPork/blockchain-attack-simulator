@@ -26,12 +26,15 @@
  *     download, and is what lets a node join late or a partition heal.
  *   - Messages already on the wire still arrive if their link is removed.
  *     Messages to a node that has been removed are dropped.
+ *   - Transactions skip the wire: a broadcast tx lands in every node's mempool
+ *     at once (see `broadcastTransaction`). Forks and attacks are races
+ *     between blocks, so only blocks are given a travel time.
  *
  * Blocks come from the mining engine (`mining`, see mining.ts), which shares
  * this network's simulator: its block-found events and the block-arrive
  * events here run on the same clock, from the same seeded Rng.
  */
-import { type Block, blockHashHex } from '../core';
+import { type Block, type Transaction, type TxResult, blockHashHex } from '../core';
 import { Chain, type SubmitBlockResult } from '../node';
 import { type BlockFound, Mining } from './mining';
 import { Simulator } from './simulator';
@@ -234,6 +237,19 @@ export class Network {
     return result;
   }
 
+  /**
+   * Node `origin` sends a transaction to the whole network. Its own mempool
+   * takes it first; if it accepts the tx, every other node gets it at the same
+   * moment and validates it against its own view. Returns the origin's
+   * verdict. As with any mempool, the first tx seen wins: a node rejects a
+   * later tx that spends the same coin.
+   */
+  broadcastTransaction(origin: NodeId, tx: Transaction): TxResult {
+    const result = this.node(origin).chain.submitTransaction(tx);
+    if (result.ok) for (const node of this.nodeMap.values()) if (node.id !== origin) node.chain.submitTransaction(tx);
+    return result;
+  }
+
   /** Blocks currently on the wire, oldest first. */
   inFlight(): Delivery[] {
     return [...this.wire.values()];
@@ -249,7 +265,11 @@ export class Network {
     this._stats.delivered++;
     // A block the node already has comes back as 'duplicate' and stops here:
     // this is the rule that ends the flood.
-    if (node.chain.submitBlock(e.block).ok) this.relay(e.to, e.block, e.from);
+    const result = node.chain.submitBlock(e.block);
+    if (!result.ok) return;
+    this.relay(e.to, e.block, e.from);
+    // The node's miner reacts last, once the block is stored and passed on.
+    this.mining.blockReceived(e.to, e.block, result);
   }
 
   /** Send `block` from `id` to each of its peers except `except` (the peer it came from). */
