@@ -4,3 +4,4 @@
  */
 export * from './honest';
 export * from './double-spend';
+export * from './selfish';

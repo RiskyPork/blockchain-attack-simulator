@@ -62,7 +62,11 @@ export interface DoubleSpendOptions {
   amount: number;
   /** Confirmations of the payment the merchant waits for before handing over the goods (k, at least 1). */
   confirmations: number;
-  /** Give up once the public chain is this many blocks ahead of the private branch (at least 1). */
+  /**
+   * Give up once the public chain is this many blocks ahead of the private
+   * branch (at least 1). Infinity never gives up: the 51% attack, where the
+   * attacker can afford to wait because the race drifts its way.
+   */
   maxDeficit: number;
   /** Fee of the payment, and of the transaction that replaces it. Defaults to DEFAULT_ATTACK_FEE. */
   fee?: number;
@@ -116,7 +120,9 @@ export class DoubleSpendAttacker implements MinerStrategy {
     if (!Number.isSafeInteger(amount) || amount < 1) throw new RangeError('amount must be a whole number of base units >= 1');
     if (!Number.isSafeInteger(fee) || fee < 0) throw new RangeError('fee must be a whole number of base units >= 0');
     if (!Number.isInteger(confirmations) || confirmations < 1) throw new RangeError('confirmations must be an integer >= 1');
-    if (!Number.isInteger(maxDeficit) || maxDeficit < 1) throw new RangeError('maxDeficit must be an integer >= 1');
+    if (maxDeficit !== Infinity && (!Number.isInteger(maxDeficit) || maxDeficit < 1)) {
+      throw new RangeError('maxDeficit must be an integer >= 1, or Infinity');
+    }
     if (!isValidAddress(merchant)) throw new Error('merchant must be a valid address');
     this.honest = new HonestMiner(key.address);
     this.fee = fee;

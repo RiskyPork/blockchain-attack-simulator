@@ -130,6 +130,8 @@ describe('DoubleSpendAttacker: launch (S3-2)', () => {
     expect(() => new DoubleSpendAttacker({ ...base, fee: -1 })).toThrow(RangeError);
     expect(() => new DoubleSpendAttacker({ ...base, confirmations: 0 })).toThrow(RangeError);
     expect(() => new DoubleSpendAttacker({ ...base, maxDeficit: 1.5 })).toThrow(RangeError);
+    expect(() => new DoubleSpendAttacker({ ...base, maxDeficit: NaN })).toThrow(RangeError);
+    expect(() => new DoubleSpendAttacker({ ...base, maxDeficit: Infinity })).not.toThrow();
     expect(() => new DoubleSpendAttacker({ ...base, merchant: 'not an address' })).toThrow(/merchant/);
   });
 
@@ -299,6 +301,11 @@ describe('DoubleSpendAttacker: hash power decides (S3-2, S3-3)', () => {
 
   it('with more than half the hash power it gets there in the end, however long the merchant waits', () => {
     expect(successes(25, 0.55, { confirmations: 6, maxDeficit: 60 })).toBe(25);
+  });
+
+  it('the 51% attack: never giving up, it succeeds every time, even from far behind', () => {
+    expect(successes(25, 0.55, { confirmations: 6, maxDeficit: Infinity })).toBe(25);
+    expect(successes(10, 0.55, { confirmations: 20, maxDeficit: Infinity })).toBe(10);
   });
 
   it('with a minority it mostly fails, and more confirmations make it fail more often', () => {

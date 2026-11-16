@@ -80,6 +80,12 @@ export interface NodeContext {
 export interface MinerContext extends NodeContext {
   /** Find a nonce for this candidate block, and record this miner as its finder. */
   solve(template: Block): Block;
+  /**
+   * A uniform draw in [0, 1) from the run's seeded Rng, for a strategy that
+   * makes a random choice (e.g. which side of a tie to mine on). Drawing from
+   * the run's Rng, never Math.random, keeps the run reproducible from its seed.
+   */
+  random(): number;
 }
 
 /** A block the node accepted, with where it ended up: main chain, side branch or orphan pool. */
@@ -259,7 +265,11 @@ export class Mining {
 
   private minerContext(id: NodeId): MinerContext {
     const now = this.host.sim.now;
-    return { ...this.nodeContext(id), solve: (template) => this.solve(id, template, now) };
+    return {
+      ...this.nodeContext(id),
+      solve: (template) => this.solve(id, template, now),
+      random: () => this.host.sim.rng.next(),
+    };
   }
 
   private solve(id: NodeId, template: Block, now: number): Block {
