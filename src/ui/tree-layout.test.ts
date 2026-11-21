@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { blockHashHex } from '../core/block';
 import type { NodeId } from '../network';
 import { Playground } from './playground';
 import { FINAL_CONFIRMATIONS, type TreeSnapshot, type UnionBlock, layoutTree, snapshotChains } from './tree-layout';
@@ -172,5 +173,31 @@ describe('Chain tree from real nodes', () => {
       }
       for (const n of nodes) expect(layout.byHash.get(snap.tips.get(n.id)!)!.tipOf).toContain(n.id);
     }
+  });
+});
+
+describe('Chain tree: an attacker\'s hidden blocks', () => {
+  it('joins them to the tree as "withheld", off the main chain', () => {
+    const pg = new Playground({ seed: 2 });
+    pg.launchAttack({ kind: 'selfish', alpha: 0.45, gamma: 0, confirmations: 1, maxDeficit: 1 });
+    for (let i = 0; i < 200 && pg.hiddenBlocks().length < 2; i++) pg.advance(600);
+    const hidden = pg.hiddenBlocks();
+    expect(hidden.length).toBeGreaterThanOrEqual(2);
+
+    const nodes = pg.ring.map((id) => ({ id, chain: pg.chain(id) }));
+    const plain = snapshotChains(nodes);
+    const snap = snapshotChains(nodes, [...hidden, ...hidden]); // a block listed twice is only added once
+    expect(snap.blocks).toHaveLength(plain.blocks.length + hidden.length);
+
+    const layout = layoutTree(snap, pg.ring[1]);
+    const withheld = layout.blocks.filter((b) => b.status === 'withheld');
+    expect(withheld.map((b) => b.hash)).toEqual(hidden.map((b) => blockHashHex(b.header)));
+    for (const b of withheld) {
+      expect(b).toMatchObject({ heldBy: [], mainFor: [], confirmations: 0, final: false });
+      // Row 0 only past the main tip: a private branch from the tip carries on along the top.
+      if (b.row === 0) expect(b.height).toBeGreaterThan(layout.mainHeight);
+      expect(layout.byHash.get(b.parent!)!.height).toBe(b.height - 1);
+    }
+    expect(layout.stale).toBe(layoutTree(plain, pg.ring[1]).stale); // hidden blocks aren't stale
   });
 });

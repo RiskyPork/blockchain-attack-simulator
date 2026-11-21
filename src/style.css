@@ -16,6 +16,9 @@
   --other-bg: #eef3ff;
   --stale: #a1a1aa;
   --stale-bg: #f1f1ef;
+  /* The attacker's blocks and node. Checked for colour-blind separation from --accent and --other. */
+  --attack: #a21caf;
+  --attack-bg: #fdf4ff;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
 }
@@ -39,6 +42,8 @@
     --other-bg: #172033;
     --stale: #6b6b72;
     --stale-bg: #222225;
+    --attack: #f472b6;
+    --attack-bg: #33182a;
   }
 }
 
@@ -831,4 +836,241 @@ table.data output {
 
 .pill.stale {
   color: var(--muted);
+}
+
+/* ---- Attacks ------------------------------------------------------------ */
+
+.legend .key.attacker {
+  background: var(--attack-bg);
+  border-color: var(--attack);
+}
+
+.legend .key.withheld {
+  background: transparent;
+  border-color: var(--attack);
+  border-style: dashed;
+}
+
+.chain-tree .tb.attacker rect {
+  fill: var(--attack-bg);
+}
+
+.chain-tree .tb.attacker.main rect {
+  stroke: var(--attack);
+}
+
+.chain-tree .tb.attacker.main.final rect {
+  fill: var(--attack);
+}
+
+.chain-tree .tb.withheld rect {
+  fill: transparent;
+  stroke: var(--attack);
+  stroke-dasharray: 4 3;
+}
+
+.chain-tree .edge.withheld {
+  stroke: var(--attack);
+  stroke-dasharray: 4 3;
+}
+
+.pill.withheld {
+  color: var(--attack);
+}
+
+.net-graph .net-node.attacker .body {
+  fill: var(--attack-bg);
+  stroke-dasharray: 5 3;
+}
+
+.net-graph .net-node.attacker .label {
+  fill: var(--attack);
+}
+
+.activity li.withheld {
+  background: var(--attack-bg);
+}
+
+.attacker-tag {
+  color: var(--attack);
+  font-weight: 600;
+}
+
+.attack-form .slider {
+  min-width: 14em;
+}
+
+.attack-form output {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.attack-form input[type='range'] {
+  padding: 0;
+  accent-color: var(--attack);
+}
+
+.attack-form input[type='number'] {
+  width: 6em;
+}
+
+.attack-form .check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.attack-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.race {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 12px 0;
+  font-size: 0.9rem;
+}
+
+.race .row-label {
+  color: var(--muted);
+}
+
+.race .blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-height: 16px;
+}
+
+.race .blk {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent);
+  border-radius: 3px;
+  background: var(--main-bg);
+}
+
+.race .blk.attacker {
+  border-color: var(--attack);
+  background: var(--attack-bg);
+}
+
+.race .blk.hidden {
+  border-style: dashed;
+  background: transparent;
+}
+
+.race .blk.k {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--good);
+}
+
+.race .count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.states li {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.states li.on {
+  border-color: var(--attack);
+  background: var(--attack-bg);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5em, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.tile {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.tile .label {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.tile .value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile .note {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.histogram {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 120px;
+  margin: 8px 0 0;
+  padding: 0 0 0 4px;
+  border-bottom: 1px solid var(--border);
+  list-style: none;
+}
+
+.histogram li {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  max-width: 44px;
+  height: 100%;
+}
+
+.histogram .bar {
+  width: 100%;
+  min-height: 0;
+  border-radius: 4px 4px 0 0;
+  background: var(--other);
+}
+
+.histogram li:hover .bar {
+  opacity: 0.8;
+}
+
+.histogram-axis {
+  display: flex;
+  gap: 2px;
+  padding: 0 0 0 4px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.histogram-axis span {
+  flex: 1 1 0;
+  max-width: 44px;
+  text-align: center;
 }

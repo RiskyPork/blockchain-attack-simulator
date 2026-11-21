@@ -25,6 +25,12 @@ function runLoop(pg: Playground): void {
   requestAnimationFrame(frame);
 }
 
+/** Start the run and the frame loop that drives it, as the Play button does. */
+export function startPlaying(pg: Playground): void {
+  pg.play();
+  runLoop(pg);
+}
+
 export function mountTransport(root: HTMLElement, pg: Playground): void {
   root.innerHTML = `
     <div class="transport">
@@ -46,10 +52,7 @@ export function mountTransport(root: HTMLElement, pg: Playground): void {
 
   play.addEventListener('click', () => {
     if (pg.playing) pg.pause();
-    else {
-      pg.play();
-      runLoop(pg);
-    }
+    else startPlaying(pg);
   });
   step.addEventListener('click', () => {
     pg.pause();
