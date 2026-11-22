@@ -41,10 +41,12 @@ function contextOn(chain: Chain, timestamp: number) {
     chain,
     timestamp,
     solve,
+    random: () => 0,
     publish: (block) => {
       published.push(block);
       return chain.submitBlock(block);
     },
+    broadcastTransaction: (tx) => chain.submitTransaction(tx),
   };
   return { ctx, published };
 }

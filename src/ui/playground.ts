@@ -1,7 +1,8 @@
 /**
- * The live network behind the Network and Chain tree tabs: a Network of honest
- * miners that the user reshapes while it runs, and the play / pause / step /
- * speed controls that drive its simulated clock.
+ * The live network behind the Network, Chain tree and Attacks tabs: a Network
+ * of miners (honest, or one attacker among them) that the user reshapes while
+ * it runs, and the play / pause / step / speed controls that drive its
+ * simulated clock.
  *
  * No DOM here, so it is unit-tested; the panels only read it and call its
  * methods. Consensus stays in node/ and network/: this class wires nodes,
@@ -12,6 +13,11 @@
  * keeps every node reachable and makes a block cross several hops, so latency
  * adds up and forks appear without needing extreme settings.
  *
+ * Attacks: launching one restarts the run with the first node (N0) as the
+ * attacker, its hash share set to α, and every other node honest. The genesis
+ * block pays the attacker's wallet, so a double spend can start at t = 0
+ * without the attacker first having to mine some coins.
+ *
  * Reproducibility: everything random comes from the run's seeded Rng, and
  * miners' reward keys are derived from their node id. Moving the clock in
  * small or large steps fires the same events in the same order, so the run
@@ -20,6 +26,8 @@
 import {
   type Address,
   type Block,
+  COIN,
+  type KeyPair,
   ZERO_HASH,
   assembleBlock,
   blockHashHex,
@@ -30,9 +38,10 @@ import {
   targetFromLeadingZeroBits,
   utf8ToBytes,
 } from '../core';
-import { DEFAULT_BLOCK_INTERVAL, type NetEvent, Network, type NodeId, SIMULATED_POW_TARGET } from '../network';
+import { DEFAULT_BLOCK_INTERVAL, type MinerStrategy, type NetEvent, Network, type NodeId, SIMULATED_POW_TARGET } from '../network';
 import type { Chain } from '../node';
-import { HonestMiner } from '../strategies';
+import { ReorgTracker } from '../experiments';
+import { DoubleSpendAttacker, HonestMiner, SelfishMiner } from '../strategies';
 import { shortHex } from './format';
 
 /** Fast mode skips the nonce search; real mode does it at a low difficulty. */
@@ -74,6 +83,38 @@ export const NEW_NODE_HASH_POWER = 10;
 const MAX_FRAME_SECONDS = 0.25;
 const ACTIVITY_LIMIT = 200;
 
+export type AttackKind = 'double-spend' | 'selfish';
+
+/** What the user picks on the Attacks tab. Each kind ignores the other kind's fields. */
+export interface AttackConfig {
+  kind: AttackKind;
+  /** The attacker's share of the hash power, in (0, 1). */
+  alpha: number;
+  /** Double spend: confirmations the merchant waits for (k). */
+  confirmations: number;
+  /** Double spend: give up this many blocks behind; Infinity never gives up. */
+  maxDeficit: number;
+  /** Selfish mining: fraction of honest hash power that mines on the attacker's block in a tie. */
+  gamma: number;
+}
+
+export const DEFAULT_ATTACK: Readonly<AttackConfig> = { kind: 'double-spend', alpha: 0.3, confirmations: 6, maxDeficit: 10, gamma: 0 };
+
+/**
+ * The 51% attack: a double spend by a majority miner that never gives up. The
+ * race drifts its way, so it succeeds in the end however many confirmations
+ * the merchant waits for (Nakamoto 2008, section 11). This is why a chain is
+ * only immutable while no one holds more than half of the hash power.
+ */
+export const PRESET_51: Readonly<AttackConfig> = { kind: 'double-spend', alpha: 0.55, confirmations: 6, maxDeficit: Infinity, gamma: 0 };
+
+/** What the double spend pays the merchant. The attacker starts with the 50-coin genesis reward. */
+export const ATTACK_PAYMENT = 10 * COIN;
+
+export type ActiveAttack =
+  | { kind: 'double-spend'; config: Readonly<AttackConfig>; node: NodeId; strategy: DoubleSpendAttacker }
+  | { kind: 'selfish'; config: Readonly<AttackConfig>; node: NodeId; strategy: SelfishMiner };
+
 export interface BlockRef {
   hash: string;
   height: number;
@@ -82,6 +123,8 @@ export interface BlockRef {
 /** Something worth showing in the activity log. Message deliveries are too frequent to list. */
 export type Activity =
   | { kind: 'found'; time: number; node: NodeId; block: BlockRef }
+  /** The attacker found a block and kept it to itself. */
+  | { kind: 'withheld'; time: number; node: NodeId; block: BlockRef }
   /** Node `node` dropped `depth` blocks from its main chain to follow a branch with more work. */
   | { kind: 'reorg'; time: number; node: NodeId; depth: number; from: BlockRef; to: BlockRef };
 
@@ -110,7 +153,11 @@ export class Playground {
   private tips = new Map<NodeId, string>();
   private wins = new Map<NodeId, number>();
   private _activity: Activity[] = [];
-  private _reorgs = { count: 0, deepest: 0 };
+  private _reorgs = new ReorgTracker();
+  private _attackConfig: AttackConfig | null = null;
+  private _attack: ActiveAttack | null = null;
+  /** Deepest reorg each node made during the event being fired, as the chain reported it. */
+  private readonly depthThisEvent = new Map<NodeId, number>();
   private _lastEvent = '';
   private _playing = false;
   private _speed = 60;
@@ -184,8 +231,28 @@ export class Playground {
     return this._activity;
   }
 
-  get reorgs(): Readonly<{ count: number; deepest: number }> {
+  /** Reorgs on every node so far, counted by depth (one fork settling on five nodes counts five times). */
+  get reorgs(): Pick<ReorgTracker, 'count' | 'deepest' | 'histogram'> {
     return this._reorgs;
+  }
+
+  /** The running attack, or null when every node is honest. */
+  get attack(): ActiveAttack | null {
+    return this._attack;
+  }
+
+  /** Blocks the attacker has found and not published, so no node's tree has them. */
+  hiddenBlocks(): readonly Block[] {
+    const a = this._attack;
+    if (!a) return [];
+    if (a.kind === 'selfish') return a.strategy.withheld;
+    return a.strategy.phase === 'mining' ? a.strategy.privateBranch : [];
+  }
+
+  /** Whether the attacker's node found this block (published or not). */
+  isAttackerBlock(hash: string): boolean {
+    const a = this._attack;
+    return a !== null && this._net.mining.minedBlock(hash)?.miner === a.node;
   }
 
   /** What the last fired event did, in words (shown next to the Step button). */
@@ -252,6 +319,27 @@ export class Playground {
     this.changed();
   }
 
+  /**
+   * Restart the run from genesis with N0 as the attacker. The attacker gets
+   * share α of the hash power; the honest nodes share the rest in the ratio
+   * they had. A double spend is launched at once: the payment goes out at
+   * t = 0. Reset replays the same attack; endAttack goes back to all honest.
+   */
+  launchAttack(config: AttackConfig): void {
+    checkAttack(config);
+    if (this._ring.length < 2) throw new Error('an attack needs at least two nodes: the attacker and someone honest');
+    this._attackConfig = { ...config };
+    this.build(attackHashPowers(this._ring.map((id) => this._net.mining.hashPower(id)), config.alpha));
+    this.changed();
+  }
+
+  /** Restart the run from genesis with every node honest again. */
+  endAttack(): void {
+    this._attackConfig = null;
+    this.build(this._ring.map((id) => this._net.mining.hashPower(id)));
+    this.changed();
+  }
+
   /** Add a node to the ring. It starts with only genesis and catches up over its new links. */
   addNode(hashPower = NEW_NODE_HASH_POWER): NodeId {
     if (this._ring.length >= MAX_NODES) throw new Error(`at most ${MAX_NODES} nodes`);
@@ -265,6 +353,7 @@ export class Playground {
     const i = this._ring.indexOf(id);
     if (i < 0) throw new Error(`unknown node ${id}`);
     if (this._ring.length === 1) throw new Error('the network needs at least one node');
+    if (this._attack?.node === id) throw new Error('the attacker node cannot be removed while the attack runs');
     const n = this._ring.length;
     const prev = this._ring[(i - 1 + n) % n];
     const next = this._ring[(i + 1) % n];
@@ -348,9 +437,25 @@ export class Playground {
     this.tips.clear();
     this.wins.clear();
     this._activity = [];
-    this._reorgs = { count: 0, deepest: 0 };
+    this._reorgs = new ReorgTracker();
+    this._reorgs.attach(this._net);
+    this._net.onTipChange((node, change) => {
+      const depth = change.disconnected.length;
+      if (depth > 0) this.depthThisEvent.set(node, Math.max(depth, this.depthThisEvent.get(node) ?? 0));
+    });
     this._lastEvent = '';
+    // The first node added gets id 0, and becomes the attacker.
+    this._attack = this._attackConfig && makeAttack(this._attackConfig, 0);
     for (const hp of hashPowers) this.insertNode(hp);
+    // Every node is in place now, so the payment reaches every mempool.
+    if (this._attack?.kind === 'double-spend') this._attack.strategy.launch(this._net.mining.nodeContext(this._attack.node));
+  }
+
+  private strategyFor(id: NodeId): MinerStrategy {
+    const a = this._attack;
+    if (a?.node === id) return a.strategy;
+    const tieBreak = a?.kind === 'selfish' ? { favour: attackerKey().address, gamma: a.config.gamma } : undefined;
+    return new HonestMiner(minerAddress(id), { tieBreak });
   }
 
   private insertNode(hashPower: number): NodeId {
@@ -365,7 +470,7 @@ export class Playground {
     if (last !== undefined) net.connect(last, id, this.linkOptions());
     if (ring.length >= 2) net.connect(id, first, this.linkOptions());
     ring.push(id);
-    net.mining.setMiner(id, new HonestMiner(minerAddress(id)), hashPower);
+    net.mining.setMiner(id, this.strategyFor(id), hashPower);
     this.tips.set(id, bytesToHex(net.node(id).chain.tipHash));
     return id;
   }
@@ -382,10 +487,14 @@ export class Playground {
   /** Fire one event, then record what it did. */
   private fire(): NetEvent | undefined {
     const before = new Map(this._ring.map((id) => [id, storeCounts(this.chain(id))]));
+    this.depthThisEvent.clear();
     const e = this._net.sim.step();
     if (!e) return undefined;
     this._version++;
-    if (e.type === 'block-found') this.wins.set(e.miner, (this.wins.get(e.miner) ?? 0) + 1);
+    if (e.type === 'block-found') {
+      this.wins.set(e.miner, (this.wins.get(e.miner) ?? 0) + 1);
+      this.noteWithheld(e.miner);
+    }
     const reorgs = this.watchTips(e);
     this._lastEvent = this.describe(e, before.get(e.type === 'block-arrive' ? e.to : e.miner), reorgs);
     return e;
@@ -410,22 +519,39 @@ export class Playground {
         if (rec?.miner === id && rec.foundAt === now) this.log({ kind: 'found', time: now, node: id, block: this.ref(chain, tip) });
       }
       if (chain.isOnMainChain(old)) continue;
-      const depth = blocksOffMainChain(chain, old);
+      // The chain's own count is exact. Measuring from the tip before the event
+      // undercounts when a node extended its chain and then reorged within the
+      // same event (an attacker that receives a block, then releases its branch).
+      const depth = this.depthThisEvent.get(id) ?? blocksOffMainChain(chain, old);
       reorgs.set(id, depth);
-      this._reorgs.count++;
-      this._reorgs.deepest = Math.max(this._reorgs.deepest, depth);
       this.log({ kind: 'reorg', time: now, node: id, depth, from: this.ref(chain, old), to: this.ref(chain, tip) });
     }
     return reorgs;
+  }
+
+  /** If the block node `id` just found went nowhere (the attacker kept it), log that. */
+  private noteWithheld(id: NodeId): void {
+    if (this._attack?.node !== id) return;
+    const hidden = this.hiddenBlocks().at(-1);
+    if (!hidden) return;
+    const hash = blockHashHex(hidden.header);
+    // An older hidden block means the new one was published instead.
+    if (this._net.mining.minedBlock(hash)?.foundAt !== this.now) return;
+    this.log({ kind: 'withheld', time: this.now, node: id, block: { hash, height: coinbaseHeight(hidden) } });
   }
 
   private describe(e: NetEvent, before: StoreCounts | undefined, reorgs: Map<NodeId, number>): string {
     if (e.type === 'block-found') {
       const tip = this.tips.get(e.miner)!;
       const rec = this._net.mining.minedBlock(tip);
-      return rec?.miner === e.miner && rec.foundAt === this.now
-        ? `${nodeLabel(e.miner)} found block #${this.chain(e.miner).height} (${shortHex(tip, 6, 4)}) and sent it to its peers.`
-        : `${nodeLabel(e.miner)} found a block.`;
+      if (rec?.miner === e.miner && rec.foundAt === this.now) {
+        return `${nodeLabel(e.miner)} found block #${this.chain(e.miner).height} (${shortHex(tip, 6, 4)}) and sent it to its peers.`;
+      }
+      const last = this._activity.at(-1);
+      if (last?.kind === 'withheld' && last.time === this.now && last.node === e.miner) {
+        return `${nodeLabel(e.miner)} (attacker) found block #${last.block.height} (${shortHex(last.block.hash, 6, 4)}) and kept it hidden.`;
+      }
+      return `${nodeLabel(e.miner)} found a block.`;
     }
     const hash = blockHashHex(e.block.header);
     const what = `Block #${this.heightOf(hash) ?? '?'} (${shortHex(hash, 6, 4)}) reached ${nodeLabel(e.to)} from ${nodeLabel(e.from)}`;
@@ -460,6 +586,47 @@ export class Playground {
   private emit(): void {
     for (const fn of this.listeners) fn();
   }
+}
+
+function makeAttack(config: AttackConfig, node: NodeId): ActiveAttack {
+  const key = attackerKey();
+  if (config.kind === 'selfish') return { kind: 'selfish', config, node, strategy: new SelfishMiner(key.address) };
+  const strategy = new DoubleSpendAttacker({
+    key,
+    merchant: merchantAddress(),
+    amount: ATTACK_PAYMENT,
+    confirmations: config.confirmations,
+    maxDeficit: config.maxDeficit,
+  });
+  return { kind: 'double-spend', config, node, strategy };
+}
+
+function checkAttack(c: AttackConfig): void {
+  if (!(c.alpha > 0 && c.alpha < 1)) throw new RangeError('alpha must be in (0, 1)');
+  if (!(c.gamma >= 0 && c.gamma <= 1)) throw new RangeError('gamma must be in [0, 1]');
+  if (!Number.isInteger(c.confirmations) || c.confirmations < 1) throw new RangeError('confirmations must be an integer >= 1');
+  if (c.maxDeficit !== Infinity && (!Number.isInteger(c.maxDeficit) || c.maxDeficit < 1)) {
+    throw new RangeError('maxDeficit must be an integer >= 1, or Infinity');
+  }
+}
+
+/**
+ * Hash powers for an attack: the first node gets share α, and the others
+ * share 1 − α in the ratio they had (equally if none had any). Out of 100,
+ * rounded to hundredths.
+ */
+export function attackHashPowers(powers: readonly number[], alpha: number): number[] {
+  const honest = powers.slice(1);
+  const total = honest.reduce((s, p) => s + p, 0);
+  const weights = total > 0 ? honest : honest.map(() => 1);
+  const sum = total > 0 ? total : honest.length;
+  const round = (x: number) => Math.round(x * 100) / 100;
+  return [round(100 * alpha), ...weights.map((w) => round((100 * (1 - alpha) * w) / sum))];
+}
+
+function coinbaseHeight(block: Block): number {
+  const cb = block.txs[0];
+  return 'height' in cb ? cb.height : -1;
 }
 
 function checkDelay(seconds: number, name: string): number {
@@ -503,6 +670,18 @@ export function minerAddress(id: NodeId): Address {
   return addressFor(`playground node ${id}`);
 }
 
+let attacker: KeyPair | null = null;
+
+/** The attacker's wallet: it signs the double spend and collects the attacker's rewards. */
+export function attackerKey(): KeyPair {
+  return (attacker ??= keyPairFromPrivate(sha256(utf8ToBytes('playground attacker'))));
+}
+
+/** Who the double spend pays, and then takes back. */
+export function merchantAddress(): Address {
+  return addressFor('playground merchant');
+}
+
 const genesisCache = new Map<PowMode, Block>();
 
 /** The shared first block. Its target sets the network's difficulty, and so the PoW mode. */
@@ -510,7 +689,8 @@ export function genesisFor(pow: PowMode): Block {
   let g = genesisCache.get(pow);
   if (!g) {
     const target = pow === 'real' ? targetFromLeadingZeroBits(REAL_POW_BITS) : SIMULATED_POW_TARGET;
-    const t = assembleBlock({ prevHash: ZERO_HASH, height: 0, timestamp: 0, target, minerAddress: addressFor('playground genesis'), txs: [], fees: 0 });
+    // The genesis reward is the attacker's starting balance (see the top of this file).
+    const t = assembleBlock({ prevHash: ZERO_HASH, height: 0, timestamp: 0, target, minerAddress: attackerKey().address, txs: [], fees: 0 });
     g = { header: mineChunk(t.header, Number.MAX_SAFE_INTEGER).header, txs: t.txs };
     genesisCache.set(pow, g);
   }

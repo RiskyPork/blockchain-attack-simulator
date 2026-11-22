@@ -1,6 +1,8 @@
 /**
  * Chain tree tab: every block any node stores, drawn left to right by height,
- * with forks branching off below the main chain. tree-layout.ts decides where
+ * with forks branching off below the main chain. During an attack the
+ * attacker's blocks get their own colour, and its hidden blocks (which no
+ * node stores yet) are drawn dashed, so the private branch can be watched. tree-layout.ts decides where
  * each block goes and how it is labelled; this file only draws it.
  */
 import type { NodeId } from '../network';
@@ -43,6 +45,8 @@ export function mountChainTree(root: HTMLElement, app: App): void {
         <li><span class="key other"></span>On another node's main chain: still spreading, or one side of an unsettled fork</li>
         <li><span class="key stale"></span>Stale: lost a fork race, so no node builds on it</li>
         <li><span class="tip-key">▲ N0</span>A node's current tip</li>
+        <li data-ref="attack-key" hidden><span class="key attacker"></span>Found by the attacker</li>
+        <li data-ref="withheld-key" hidden><span class="key withheld"></span>Hidden: the attacker hasn't published it, so no node has it</li>
       </ul>
       <div class="tree-scroll" data-ref="scroll">
         <svg class="chain-tree" data-ref="svg" role="group" aria-label="Block tree"></svg>
@@ -93,8 +97,12 @@ export function mountChainTree(root: HTMLElement, app: App): void {
     drawnAt = t;
 
     const vp = viewpoint();
-    layout = layoutTree(snapshotChains(pg.ring.map((id) => ({ id, chain: pg.chain(id) }))), vp);
-    const drawing = drawTree(layout, Number(windowSel.value), selected, pg.ring.length);
+    const hidden = pg.hiddenBlocks();
+    layout = layoutTree(snapshotChains(pg.ring.map((id) => ({ id, chain: pg.chain(id) })), hidden), vp);
+    const isAttacker = (hash: string) => pg.isAttackerBlock(hash);
+    const drawing = drawTree(layout, Number(windowSel.value), selected, pg.ring.length, isAttacker);
+    ref<HTMLElement>('attack-key').hidden = pg.attack === null;
+    ref<HTMLElement>('withheld-key').hidden = pg.attack === null;
     svg.setAttribute('width', String(drawing.width));
     svg.setAttribute('height', String(drawing.height));
     svg.setAttribute('viewBox', `0 0 ${drawing.width} ${drawing.height}`);
@@ -107,6 +115,7 @@ export function mountChainTree(root: HTMLElement, app: App): void {
       `${layout.blocks.length} blocks stored across ${pg.ring.length} node${pg.ring.length === 1 ? '' : 's'} · ` +
       `${layout.stale} stale${found > 0 ? ` (${((layout.stale / found) * 100).toFixed(1)}% of blocks found)` : ''} · ` +
       `${nodeLabel(vp)}'s tip is #${layout.mainHeight} · ` +
+      (hidden.length > 0 ? `<strong>${hidden.length} hidden by the attacker</strong> · ` : '') +
       (tips === 1 ? 'all nodes agree on the tip' : `<strong>nodes disagree: ${tips} different tips</strong>`);
 
     const block = selected ? layout.byHash.get(selected) : undefined;
@@ -132,10 +141,14 @@ export function mountChainTree(root: HTMLElement, app: App): void {
       status =
         `<span class="pill other">not on ${vpName}'s chain</span> On the main chain of ${list(b.mainFor)}, but not ${vpName}'s. ` +
         `Either it hasn't reached ${vpName} yet, or it is one side of a fork that the next blocks will settle.`;
-    } else {
+    } else if (b.status === 'stale') {
       status =
         '<span class="pill stale">stale</span> No node has it on its main chain: it lost a fork race. Nodes keep it in case ' +
         'its branch overtakes, but nobody builds on it, so its coinbase reward is worth nothing.';
+    } else {
+      status =
+        '<span class="pill withheld">hidden</span> The attacker found this block and is keeping it to itself. ' +
+        'No node has it yet. It is published only when that helps the attacker: to overtake the public chain, or to tie it.';
     }
     return `
       <dl class="header-fields">
@@ -145,7 +158,7 @@ export function mountChainTree(root: HTMLElement, app: App): void {
         <dt>Parent</dt><dd>${b.parent ? `<code class="wrap">${b.parent}</code>` : 'none: every node starts from this block'}</dd>
         <dt>Found</dt><dd>${
           rec
-            ? `by <strong>${nodeLabel(rec.miner)}</strong> at t = ${fmtSimTime(rec.foundAt)}, ` +
+            ? `by <strong>${nodeLabel(rec.miner)}</strong>${pg.isAttackerBlock(b.hash) ? ' (attacker)' : ''} at t = ${fmtSimTime(rec.foundAt)}, ` +
               (rec.pow === 'real' ? `real PoW after ${rec.attempts.toLocaleString('en-US')} nonces` : 'simulated PoW (no nonce search)')
             : 'genesis block, created before the run'
         }</dd>
@@ -184,7 +197,7 @@ export function mountChainTree(root: HTMLElement, app: App): void {
 }
 
 /** The tree as SVG markup, cut to the last `heights` heights (0 = all). */
-function drawTree(layout: TreeLayout, heights: number, selected: string | null, nodeCount: number) {
+function drawTree(layout: TreeLayout, heights: number, selected: string | null, nodeCount: number, isAttacker: (hash: string) => boolean) {
   const visible = heights > 0 ? layout.blocks.filter((b) => b.height > layout.maxHeight - heights) : layout.blocks;
   let minH = Number.POSITIVE_INFINITY;
   let maxRow = 0;
@@ -212,7 +225,7 @@ function drawTree(layout: TreeLayout, heights: number, selected: string | null, 
     } else if (parent) {
       edges.push(`<path class="edge ${b.status}" d="M${bx - 12} ${by} H${bx}" />`); // parent is off the left edge
     }
-    blocks.push(blockSvg(b, bx, y(b.row), selected === b.hash, nodeCount));
+    blocks.push(blockSvg(b, bx, y(b.row), selected === b.hash, nodeCount, isAttacker(b.hash)));
   }
 
   // The finality line sits between the last block with 6 confirmations and the first with 5.
@@ -228,13 +241,14 @@ function drawTree(layout: TreeLayout, heights: number, selected: string | null, 
   return { html: `${finality}<g>${edges.join('')}</g><g>${blocks.join('')}</g>`, width, height };
 }
 
-function blockSvg(b: PlacedBlock, x: number, y: number, selected: boolean, nodeCount: number): string {
-  const classes = ['tb', b.status, b.final ? 'final' : '', selected ? 'selected' : ''].filter(Boolean).join(' ');
+function blockSvg(b: PlacedBlock, x: number, y: number, selected: boolean, nodeCount: number, attacker: boolean): string {
+  const classes = ['tb', b.status, b.final ? 'final' : '', attacker ? 'attacker' : '', selected ? 'selected' : ''].filter(Boolean).join(' ');
   const conf = b.status === 'main' ? `, ${b.confirmations} confirmation${b.confirmations === 1 ? '' : 's'}` : '';
   const tipText =
     b.tipOf.length === 0 ? '' : b.tipOf.length === nodeCount && nodeCount > 1 ? 'all nodes' : b.tipOf.length > 3 ? `${b.tipOf.length} nodes` : b.tipOf.map(nodeLabel).join(' ');
-  return `<g class="${classes}" data-hash="${b.hash}" tabindex="0" role="button" aria-label="Block ${b.height}, ${b.status}${conf}">
-    <title>#${b.height} ${b.hash.slice(0, 16)}… (${b.status}${conf})${b.tipOf.length ? `\nTip of ${b.tipOf.map(nodeLabel).join(', ')}` : ''}</title>
+  const by = attacker ? ', found by the attacker' : '';
+  return `<g class="${classes}" data-hash="${b.hash}" tabindex="0" role="button" aria-label="Block ${b.height}, ${b.status}${conf}${by}">
+    <title>#${b.height} ${b.hash.slice(0, 16)}… (${b.status}${conf}${by})${b.tipOf.length ? `\nTip of ${b.tipOf.map(nodeLabel).join(', ')}` : ''}</title>
     <rect x="${x}" y="${y}" width="${BW}" height="${BH}" rx="6" />
     <circle class="dot" cx="${x + 9}" cy="${y + BH / 2}" r="3.5" style="fill:${blockColor(b.hash)}" />
     <text class="h" x="${x + BW / 2 + 5}" y="${y + BH / 2 + 4}" text-anchor="middle">#${b.height}</text>

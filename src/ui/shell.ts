@@ -3,6 +3,7 @@
  * as features land. UI code only reads simulator
  * state and dispatches user actions; it holds no consensus logic.
  */
+import { mountAttacks } from './attacks';
 import { mountChainTree } from './chaintree';
 import { mountExplorer } from './explorer';
 import { mountNetwork } from './network';
@@ -22,7 +23,7 @@ const TABS: Tab[] = [
   { id: 'explorer', label: 'Explorer', sprint: 1, blurb: 'Blocks, transactions, Merkle roots and real SHA-256 proof-of-work.', mount: mountExplorer },
   { id: 'network', label: 'Network', sprint: 2, blurb: 'Nodes, hash power, link latency and block propagation.', mount: mountNetwork },
   { id: 'chain', label: 'Chain tree', sprint: 2, blurb: 'Every block including stale forks; the most-work chain is highlighted.', mount: mountChainTree },
-  { id: 'attacks', label: 'Attacks', sprint: 3, blurb: '51% / double-spend and selfish mining, live.' },
+  { id: 'attacks', label: 'Attacks', sprint: 3, blurb: '51% / double-spend and selfish mining, live.', mount: mountAttacks },
   { id: 'experiments', label: 'Experiments', sprint: 4, blurb: 'Batch trials: simulated success rate vs. theory.' },
 ];
 

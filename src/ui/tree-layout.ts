@@ -13,6 +13,8 @@
  *   stale  on no node's main chain: it lost a fork race. Nodes keep it in
  *          case its branch overtakes, but nobody builds on it and its miner's
  *          reward is worthless.
+ *   withheld  found by an attacker and not published, so no node stores it.
+ *          The view shows it anyway, so you can watch the private branch grow.
  *
  * A main-chain block is final once it has FINAL_CONFIRMATIONS confirmations,
  * Bitcoin's usual rule of thumb: an attacker with less than half the hash
@@ -31,11 +33,11 @@
  */
 import type { NodeId } from '../network';
 import type { Chain } from '../node';
-import { bytesToHex } from '../core';
+import { type Block, blockHashHex, bytesToHex } from '../core';
 
 export const FINAL_CONFIRMATIONS = 6;
 
-export type BlockStatus = 'main' | 'other' | 'stale';
+export type BlockStatus = 'main' | 'other' | 'stale' | 'withheld';
 
 /** One block in the union of every node's tree. */
 export interface UnionBlock {
@@ -76,8 +78,12 @@ export interface TreeLayout {
   stale: number;
 }
 
-/** Merge every node's block tree into one list, recording who stores each block and whose main chain it is on. */
-export function snapshotChains(nodes: readonly { id: NodeId; chain: Chain }[]): TreeSnapshot {
+/**
+ * Merge every node's block tree into one list, recording who stores each
+ * block and whose main chain it is on. `hidden` are an attacker's unpublished
+ * blocks, parents first; they join with no holders.
+ */
+export function snapshotChains(nodes: readonly { id: NodeId; chain: Chain }[], hidden: readonly Block[] = []): TreeSnapshot {
   const byHash = new Map<string, UnionBlock>();
   const tips = new Map<NodeId, string>();
   for (const { id, chain } of nodes) {
@@ -94,6 +100,12 @@ export function snapshotChains(nodes: readonly { id: NodeId; chain: Chain }[]): 
     }
     if (chain.height >= 0) tips.set(id, bytesToHex(chain.tipHash));
   }
+  for (const block of hidden) {
+    const hash = blockHashHex(block.header);
+    const parent = byHash.get(bytesToHex(block.header.prevHash));
+    if (byHash.has(hash) || !parent) continue;
+    byHash.set(hash, { hash, parent: parent.hash, height: parent.height + 1, heldBy: [], mainFor: [] });
+  }
   return { blocks: [...byHash.values()], tips };
 }
 
@@ -107,7 +119,13 @@ export function layoutTree(snapshot: TreeSnapshot, viewpoint: NodeId): TreeLayou
   for (const [id, hash] of tips) tipOf.set(hash, [...(tipOf.get(hash) ?? []), id]);
 
   const placed: PlacedBlock[] = blocks.map((b) => {
-    const status: BlockStatus = b.mainFor.includes(viewpoint) ? 'main' : b.mainFor.length > 0 ? 'other' : 'stale';
+    const status: BlockStatus = b.mainFor.includes(viewpoint)
+      ? 'main'
+      : b.mainFor.length > 0
+        ? 'other'
+        : b.heldBy.length > 0
+          ? 'stale'
+          : 'withheld';
     const confirmations = status === 'main' ? mainHeight - b.height + 1 : 0;
     return { ...b, row: 0, status, confirmations, final: confirmations >= FINAL_CONFIRMATIONS, tipOf: tipOf.get(b.hash) ?? [] };
   });
@@ -124,7 +142,7 @@ export function layoutTree(snapshot: TreeSnapshot, viewpoint: NodeId): TreeLayou
     deepest[p] = Math.max(deepest[p], deepest[i]);
   }
 
-  const statusRank = { main: 0, other: 1, stale: 2 };
+  const statusRank = { main: 0, other: 1, stale: 2, withheld: 3 };
   const preferred = (a: number, b: number) =>
     statusRank[placed[a].status] - statusRank[placed[b].status] ||
     placed[b].mainFor.length - placed[a].mainFor.length ||

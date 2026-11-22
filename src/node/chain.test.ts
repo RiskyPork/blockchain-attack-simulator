@@ -119,6 +119,7 @@ describe('Chain: empty chain', () => {
     const c = new Chain({ target: T8 });
     expect(c.target).toBe(T8);
     expect(c.height).toBe(-1);
+    expect(c.chainWork).toBe(0n);
     expect(bytesToHex(c.tipHash)).toBe(bytesToHex(ZERO_HASH));
     expect(c.tipHash.length).toBe(32);
     expect(c.blocks).toEqual([]);
@@ -778,6 +779,7 @@ describe('Chain: fork choice and reorgs', () => {
     const [a2, a3] = runOn(a1, 2); // a-branch above base: 3 easy blocks, work 3 × 256
     chain.submitBlock(a2);
     chain.submitBlock(a3);
+    expect(chain.chainWork).toBe(5n * 256n); // g, base, a1, a2, a3
     chain.target = T9;
     const [h1, h2] = runOn(base, 2, { target: T9 }); // h-branch: 2 hard blocks, work 2 × 512
     expect(chain.submitBlock(h1)).toEqual({ ok: true, status: 'stale', tipChange: null });
@@ -787,6 +789,7 @@ describe('Chain: fork choice and reorgs', () => {
       tipChange: { disconnected: [a1, a2, a3], connected: [h1, h2] },
     });
     expect(chain.height).toBe(3); // down from 4
+    expect(chain.chainWork).toBe(2n * 256n + 2n * 512n); // g, base, h1, h2: more work on a shorter chain
     expect(chain.tree.get(hashOf(h2))!.chainWork).toBeGreaterThan(chain.tree.get(hashOf(a3))!.chainWork);
     expectMatchesReplay(chain);
   });

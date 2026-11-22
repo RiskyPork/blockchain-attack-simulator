@@ -26,13 +26,16 @@
  *     download, and is what lets a node join late or a partition heal.
  *   - Messages already on the wire still arrive if their link is removed.
  *     Messages to a node that has been removed are dropped.
+ *   - Transactions skip the wire: a broadcast tx lands in every node's mempool
+ *     at once (see `broadcastTransaction`). Forks and attacks are races
+ *     between blocks, so only blocks are given a travel time.
  *
  * Blocks come from the mining engine (`mining`, see mining.ts), which shares
  * this network's simulator: its block-found events and the block-arrive
  * events here run on the same clock, from the same seeded Rng.
  */
-import { type Block, blockHashHex } from '../core';
-import { Chain, type SubmitBlockResult } from '../node';
+import { type Block, type Transaction, type TxResult, blockHashHex } from '../core';
+import { Chain, type SubmitBlockResult, type TipChange } from '../node';
 import { type BlockFound, Mining } from './mining';
 import { Simulator } from './simulator';
 
@@ -85,6 +88,9 @@ export interface NetworkStats {
   dropped: number;
 }
 
+/** Called whenever a node's main chain moves. `change.disconnected.length` is the reorg depth (0 for a plain extension). */
+export type TipChangeListener = (node: NodeId, change: TipChange) => void;
+
 export interface NetworkNode {
   readonly id: NodeId;
   readonly chain: Chain;
@@ -110,6 +116,7 @@ export class Network {
   private readonly peerMap = new Map<NodeId, Map<NodeId, Link>>();
   private readonly wire = new Map<number, Delivery>();
   private readonly _stats: NetworkStats = { sent: 0, delivered: 0, dropped: 0 };
+  private readonly tipListeners = new Set<TipChangeListener>();
   private nextId = 0;
   private nextMsg = 0;
 
@@ -128,6 +135,15 @@ export class Network {
 
   get stats(): Readonly<NetworkStats> {
     return { ...this._stats };
+  }
+
+  /**
+   * Watch every node's main chain move, e.g. to count reorgs and their depth
+   * (experiments/metrics.ts). Returns a function that stops watching.
+   */
+  onTipChange(listener: TipChangeListener): () => void {
+    this.tipListeners.add(listener);
+    return () => this.tipListeners.delete(listener);
   }
 
   // -------------------------------------------------------------------------
@@ -230,7 +246,23 @@ export class Network {
    */
   publish(origin: NodeId, block: Block): SubmitBlockResult {
     const result = this.node(origin).chain.submitBlock(block);
-    if (result.ok) this.relay(origin, block, null);
+    if (result.ok) {
+      this.tipMoved(origin, result);
+      this.relay(origin, block, null);
+    }
+    return result;
+  }
+
+  /**
+   * Node `origin` sends a transaction to the whole network. Its own mempool
+   * takes it first; if it accepts the tx, every other node gets it at the same
+   * moment and validates it against its own view. Returns the origin's
+   * verdict. As with any mempool, the first tx seen wins: a node rejects a
+   * later tx that spends the same coin.
+   */
+  broadcastTransaction(origin: NodeId, tx: Transaction): TxResult {
+    const result = this.node(origin).chain.submitTransaction(tx);
+    if (result.ok) for (const node of this.nodeMap.values()) if (node.id !== origin) node.chain.submitTransaction(tx);
     return result;
   }
 
@@ -249,7 +281,16 @@ export class Network {
     this._stats.delivered++;
     // A block the node already has comes back as 'duplicate' and stops here:
     // this is the rule that ends the flood.
-    if (node.chain.submitBlock(e.block).ok) this.relay(e.to, e.block, e.from);
+    const result = node.chain.submitBlock(e.block);
+    if (!result.ok) return;
+    this.tipMoved(e.to, result);
+    this.relay(e.to, e.block, e.from);
+    // The node's miner reacts last, once the block is stored and passed on.
+    this.mining.blockReceived(e.to, e.block, result);
+  }
+
+  private tipMoved(id: NodeId, result: SubmitBlockResult): void {
+    if (result.ok && result.tipChange) for (const fn of this.tipListeners) fn(id, result.tipChange);
   }
 
   /** Send `block` from `id` to each of its peers except `except` (the peer it came from). */

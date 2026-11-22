@@ -58,6 +58,7 @@ export function mountNetwork(root: HTMLElement, app: App): void {
         <h3>Nodes</h3>
         <button data-ref="add">Add node</button>
       </div>
+      <div data-ref="attack-note"></div>
       <div class="table-scroll">
         <table class="data">
           <thead><tr>
@@ -163,7 +164,8 @@ export function mountNetwork(root: HTMLElement, app: App): void {
     const nodes = pg.ring
       .map((id) => {
         const p = pos.get(id)!;
-        return `<g class="net-node" data-node="${id}" transform="translate(${p.x} ${p.y})">
+        const cls = pg.attack?.node === id ? 'net-node attacker' : 'net-node';
+        return `<g class="${cls}" data-node="${id}" transform="translate(${p.x} ${p.y})">
           <circle class="halo" r="20" />
           <circle class="body" r="20" />
           <text class="label" y="4">${nodeLabel(id)}</text>
@@ -229,8 +231,9 @@ export function mountNetwork(root: HTMLElement, app: App): void {
     rows.innerHTML = pg.ring
       .map((id) => {
         const label = nodeLabel(id);
+        const tag = pg.attack?.node === id ? ' <span class="attacker-tag">attacker</span>' : '';
         return `<tr data-node="${id}">
-          <td><strong>${label}</strong></td>
+          <td><strong>${label}</strong>${tag}</td>
           <td class="hp"><input type="range" min="0" max="100" step="1" value="${pg.net.mining.hashPower(id)}" data-hp="${id}"
             aria-label="Hash power of ${label}" /> <output data-cell="hp"></output></td>
           <td class="num" data-cell="share"></td>
@@ -252,14 +255,21 @@ export function mountNetwork(root: HTMLElement, app: App): void {
       const cell = (name: string) => tr.querySelector<HTMLElement>(`[data-cell="${name}"]`)!;
       const slider = tr.querySelector<HTMLInputElement>('[data-hp]')!;
       if (document.activeElement !== slider) slider.value = String(n.hashPower);
-      cell('hp').textContent = String(n.hashPower);
+      cell('hp').textContent = String(Math.round(n.hashPower * 10) / 10); // attack presets split power into fractions
       cell('share').textContent = `${(n.share * 100).toFixed(1)}%`;
       cell('height').textContent = String(n.height);
       cell('tip').innerHTML = `${swatch(n.tip)}<code>${shortHex(n.tip, 6, 4)}</code>`;
       cell('found').textContent = String(n.found);
       cell('orphans').textContent = String(n.orphans);
-      tr.querySelector<HTMLButtonElement>('[data-remove]')!.disabled = only;
+      const remove = tr.querySelector<HTMLButtonElement>('[data-remove]')!;
+      remove.disabled = only || pg.attack?.node === n.id;
+      if (pg.attack?.node === n.id) remove.title = 'The attacker stays while the attack runs';
     }
+    const a = pg.attack;
+    ref('attack-note').innerHTML = a
+      ? banner('info', `${nodeLabel(a.node)} is running a ${a.kind === 'selfish' ? 'selfish mining' : 'double-spend'} attack (see the Attacks tab). ` +
+          'Reset run replays the same attack from genesis.')
+      : '';
     addBtn.disabled = pg.ring.length >= MAX_NODES;
     addBtn.title = addBtn.disabled ? `At most ${MAX_NODES} nodes` : '';
   }
@@ -364,9 +374,14 @@ function blockRef(b: BlockRef): string {
   return `${swatch(b.hash)}#${b.height} <code>${esc(shortHex(b.hash, 6, 4))}</code>`;
 }
 
-function activityHtml(a: Activity): string {
+/** One activity log entry. The Attacks tab shows the same log. */
+export function activityHtml(a: Activity): string {
   const time = `<span class="when">${fmtSimTime(a.time)}</span>`;
   if (a.kind === 'found') return `<li>${time} <strong>${nodeLabel(a.node)}</strong> found block ${blockRef(a.block)}</li>`;
+  if (a.kind === 'withheld') {
+    return `<li class="withheld">${time} <strong>${nodeLabel(a.node)}</strong> (attacker) found block ${blockRef(a.block)}
+      and kept it hidden</li>`;
+  }
   const blocks = `${a.depth} block${a.depth === 1 ? '' : 's'}`;
   return `<li class="reorg">${time} <strong>${nodeLabel(a.node)}</strong> reorg: undid ${blocks} (tip was ${blockRef(a.from)})
     and switched to ${blockRef(a.to)}, a branch with more work</li>`;
