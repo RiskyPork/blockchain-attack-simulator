@@ -247,8 +247,9 @@ function mountPanel<E extends Experiment>(card: HTMLElement, readNetwork: () => 
     if (!e) return;
     const c = spec.chart(e, result, { nakamoto: nakamoto?.checked ?? false });
     ref('legend').innerHTML = legendHtml(c);
-    chartBox.querySelector('svg')?.remove();
-    chartBox.insertAdjacentHTML('afterbegin', chartSvg(c));
+    // The scroller keeps the chart at a readable size on a phone; the tooltip sits outside it.
+    chartBox.querySelector('.chart-scroll')?.remove();
+    chartBox.insertAdjacentHTML('afterbegin', `<div class="chart-scroll">${chartSvg(c)}</div>`);
     ref('caption').textContent = result
       ? `${result.done < result.total ? `Partial: ${result.done} of ${result.total} trials. ` : ''}${describeSettings(result.experiment)}.`
       : `Theory only, for ${describeSettings(e)}. Press Run to add simulated points.`;

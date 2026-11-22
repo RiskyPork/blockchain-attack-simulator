@@ -39,7 +39,7 @@ export function mountAttacks(root: HTMLElement, app: App): void {
             <option value="selfish">Selfish mining</option>
           </select>
         </label>
-        <label class="slider">Attacker's hash share α: <output name="alpha-out"></output>
+        <label class="slider"><span>Attacker's hash share α: <output name="alpha-out"></output></span>
           <input type="range" name="alpha" min="5" max="95" step="1" />
         </label>
         <label data-kind="double-spend">Merchant waits for k confirmations
@@ -49,7 +49,7 @@ export function mountAttacks(root: HTMLElement, app: App): void {
           <input type="number" name="deficit" min="1" max="100" step="1" />
         </label>
         <label class="check" data-kind="double-spend"><input type="checkbox" name="never" /> Never give up</label>
-        <label class="slider" data-kind="selfish">Tie-break γ: <output name="gamma-out"></output>
+        <label class="slider" data-kind="selfish"><span>Tie-break γ: <output name="gamma-out"></output></span>
           <input type="range" name="gamma" min="0" max="100" step="5" />
         </label>
       </form>

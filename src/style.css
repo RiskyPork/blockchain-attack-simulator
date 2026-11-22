@@ -946,6 +946,8 @@ table.data output {
   flex-direction: row;
   align-items: center;
   gap: 6px;
+  /* As tall as the inputs beside it, so the box lines up with them. */
+  min-height: 2.25rem;
 }
 
 .attack-buttons {
@@ -1160,9 +1162,15 @@ table.data output {
   max-width: 760px;
 }
 
+.chart-scroll {
+  overflow-x: auto;
+}
+
 svg.chart {
   display: block;
   width: 100%;
+  /* Below this the tick labels get too small to read; the chart scrolls sideways instead. */
+  min-width: 520px;
   height: auto;
   overflow: visible;
   font-family: var(--font);
