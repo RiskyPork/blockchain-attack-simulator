@@ -141,7 +141,13 @@ export function serializeTx(tx: Transaction, { withWitness = true } = {}): Uint8
   return w.done();
 }
 
+/** Decoded addresses. Serializing a tx (to get its txid) decodes every output's address, and the same ones recur. */
+const payloads = new Map<Address, Uint8Array>();
+
+/** The address's version byte and HASH160. The writer copies it, so the cached array is never handed out to change. */
 function addressPayload(address: Address): Uint8Array {
+  const cached = payloads.get(address);
+  if (cached) return cached;
   let payload: Uint8Array;
   try {
     payload = base58CheckDecode(address);
@@ -149,6 +155,8 @@ function addressPayload(address: Address): Uint8Array {
     throw new Error(`invalid address '${address}'`);
   }
   if (payload.length !== ADDRESS_PAYLOAD_BYTES) throw new Error(`invalid address '${address}'`);
+  if (payloads.size >= 50_000) payloads.clear();
+  payloads.set(address, payload);
   return payload;
 }
 

@@ -14,7 +14,7 @@ import * as secp from '@noble/secp256k1';
 import { hmac } from '@noble/hashes/hmac.js';
 import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
 import { base58CheckDecode, base58CheckEncode } from './base58';
-import { concatBytes, hash160 } from './hash';
+import { bytesToHex, concatBytes, hash160 } from './hash';
 
 // noble/secp256k1 needs hash functions supplied to use its synchronous API.
 // Sync signing matters because validation runs inside the simulation loop.
@@ -65,23 +65,53 @@ export function signDigest(digest: Uint8Array, privateKey: Uint8Array): Uint8Arr
   return secp.sign(digest, privateKey, { prehash: false });
 }
 
+/**
+ * Signature cache, as in Bitcoin Core (CSignatureCache): every node checks a
+ * transaction's signatures when it enters the mempool and again when a block
+ * holding it connects, and the batch runner replays the same transactions in
+ * every trial. ECDSA verification is by far the costliest check, so a
+ * (signature, digest, public key) triple that verified once is remembered.
+ * Only successes are stored, and a hit needs all three to match byte for byte,
+ * so the answer is always the one secp.verify would give.
+ */
+const verifiedSignatures = new Set<string>();
+const SIGNATURE_CACHE_LIMIT = 50_000;
+
 /** True iff `signature` is a valid signature of `digest` by `publicKey`. Never throws. */
 export function verifyDigest(signature: Uint8Array, digest: Uint8Array, publicKey: Uint8Array): boolean {
+  const key = `${bytesToHex(signature)}${bytesToHex(digest)}${bytesToHex(publicKey)}`;
+  if (verifiedSignatures.has(key)) return true;
+  let ok: boolean;
   try {
-    return secp.verify(signature, digest, publicKey, { prehash: false });
+    ok = secp.verify(signature, digest, publicKey, { prehash: false });
   } catch {
-    return false;
+    ok = false;
   }
+  if (ok) {
+    if (verifiedSignatures.size >= SIGNATURE_CACHE_LIMIT) verifiedSignatures.clear();
+    verifiedSignatures.add(key);
+  }
+  return ok;
 }
+
+/** Addresses already found well-formed. Every node checks the same few coinbase addresses in every block. */
+const validAddresses = new Set<string>();
 
 /** Address is well-formed: valid Base58Check, right version byte, 20-byte HASH160 payload. */
 export function isValidAddress(address: string): boolean {
+  if (validAddresses.has(address)) return true;
+  let ok: boolean;
   try {
     const payload = base58CheckDecode(address);
-    return payload.length === 21 && payload[0] === ADDRESS_VERSION;
+    ok = payload.length === 21 && payload[0] === ADDRESS_VERSION;
   } catch {
-    return false;
+    ok = false;
   }
+  if (ok) {
+    if (validAddresses.size >= SIGNATURE_CACHE_LIMIT) validAddresses.clear();
+    validAddresses.add(address);
+  }
+  return ok;
 }
 
 /** True iff `publicKey` hashes to `address`; used to check who may spend an output. */
