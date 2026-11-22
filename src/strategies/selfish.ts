@@ -173,6 +173,23 @@ export class SelfishMiner implements MinerStrategy {
     this.publicHeight = ctx.chain.height;
   }
 
+  /**
+   * Publish every block still withheld and stop racing: for the end of a
+   * measured run. With a lead of 2 or more the miner was sure to win all of
+   * them in the end (it publishes everything once its lead drops to 1), so
+   * leaving them out would undercount its revenue, by more the shorter the
+   * run and the larger α. With a lead of 1 it gets the block for free, which
+   * overcounts by at most one block. Returns how many it published.
+   */
+  releaseAll(ctx: NodeContext): number {
+    const n = this.hidden.length;
+    this.publishUpTo(ctx, Infinity);
+    this.tip = null;
+    this.racing = false;
+    this.publicHeight = ctx.chain.height;
+    return n;
+  }
+
   /** Publish hidden blocks up to `height`, parents first. */
   private publishUpTo(ctx: NodeContext, height: number): void {
     while (this.hidden.length > 0 && this.hidden[0].height <= height) ctx.publish(this.hidden.shift()!.block);
