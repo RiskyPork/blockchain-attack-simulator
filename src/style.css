@@ -19,6 +19,20 @@
   /* The attacker's blocks and node. Checked for colour-blind separation from --accent and --other. */
   --attack: #a21caf;
   --attack-bg: #fdf4ff;
+  /* Experiments charts. z = 1..6: one blue, light to dark (an ordinal ramp, validated for step gaps and contrast). */
+  --z1: #86b6ef;
+  --z2: #5598e7;
+  --z3: #2a78d6;
+  --z4: #1c5cab;
+  --z5: #104281;
+  --z6: #0b2a52;
+  /* One categorical slot per γ, in fixed order (validated for colour-blind separation). */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --chart-grid: #e1e0d9;
+  --chart-axis: #c3c2b7;
+  --chart-ref: #898781;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
 }
@@ -44,6 +58,19 @@
     --stale-bg: #222225;
     --attack: #f472b6;
     --attack-bg: #33182a;
+    /* On the dark surface the ramp runs the other way: more confirmations, lighter line. */
+    --z1: #184f95;
+    --z2: #256abf;
+    --z3: #3987e5;
+    --z4: #6da7ec;
+    --z5: #9ec5f4;
+    --z6: #cde2fb;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --chart-grid: #2c2c2a;
+    --chart-axis: #383835;
+    --chart-ref: #898781;
   }
 }
 
@@ -919,6 +946,8 @@ table.data output {
   flex-direction: row;
   align-items: center;
   gap: 6px;
+  /* As tall as the inputs beside it, so the box lines up with them. */
+  min-height: 2.25rem;
 }
 
 .attack-buttons {
@@ -1073,4 +1102,177 @@ table.data output {
   flex: 1 1 0;
   max-width: 44px;
   text-align: center;
+}
+
+/* ---- Experiments ------------------------------------------------- */
+
+.run-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 12px 0 4px;
+}
+
+.run-bar progress {
+  width: 160px;
+  height: 8px;
+  accent-color: var(--accent);
+}
+
+.run-status {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  color: var(--muted);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0 4px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend line {
+  stroke-width: 2;
+}
+
+.legend circle {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.chart-box {
+  max-width: 760px;
+}
+
+.chart-scroll {
+  overflow-x: auto;
+}
+
+svg.chart {
+  display: block;
+  width: 100%;
+  /* Below this the tick labels get too small to read; the chart scrolls sideways instead. */
+  min-width: 520px;
+  height: auto;
+  overflow: visible;
+  font-family: var(--font);
+}
+
+svg.chart .grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+svg.chart .axis {
+  stroke: var(--chart-axis);
+  stroke-width: 1;
+}
+
+svg.chart .tick {
+  fill: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+svg.chart .axis-label {
+  fill: var(--muted);
+  font-size: 13px;
+}
+
+svg.chart .curve {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+svg.chart .curve.dashed {
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  opacity: 0.8;
+}
+
+svg.chart .ref {
+  fill: none;
+}
+
+svg.chart .ref,
+.legend .ref-key {
+  stroke: var(--chart-ref);
+  stroke-width: 1.5;
+}
+
+svg.chart .note-dot {
+  fill: var(--surface);
+  stroke-width: 2;
+}
+
+svg.chart .whisker {
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+
+svg.chart .dot {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+svg.chart .hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+svg.chart .pt:focus {
+  outline: none;
+}
+
+svg.chart .pt:hover .dot,
+svg.chart .pt:focus .dot {
+  r: 6;
+}
+
+svg.chart .pt:focus-visible .hit {
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.chart-tip {
+  position: absolute;
+  z-index: 2;
+  max-width: 300px;
+  padding: 6px 10px;
+  transform: translate(-50%, -100%);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+details > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
 }

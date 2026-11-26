@@ -23,32 +23,14 @@
  * small or large steps fires the same events in the same order, so the run
  * depends on the seed and the settings, not on the browser's frame rate.
  */
-import {
-  type Address,
-  type Block,
-  COIN,
-  type KeyPair,
-  ZERO_HASH,
-  assembleBlock,
-  blockHashHex,
-  bytesToHex,
-  keyPairFromPrivate,
-  mineChunk,
-  sha256,
-  targetFromLeadingZeroBits,
-  utf8ToBytes,
-} from '../core';
-import { DEFAULT_BLOCK_INTERVAL, type MinerStrategy, type NetEvent, Network, type NodeId, SIMULATED_POW_TARGET } from '../network';
+import { type Block, blockHashHex, bytesToHex } from '../core';
+import { DEFAULT_BLOCK_INTERVAL, type MinerStrategy, type NetEvent, Network, type NodeId } from '../network';
 import type { Chain } from '../node';
-import { ReorgTracker } from '../experiments';
+import { ATTACK_PAYMENT, type PowMode, ReorgTracker, attackerKey, genesisFor, merchantAddress, minerAddress } from '../experiments';
 import { DoubleSpendAttacker, HonestMiner, SelfishMiner } from '../strategies';
 import { shortHex } from './format';
 
-/** Fast mode skips the nonce search; real mode does it at a low difficulty. */
-export type PowMode = 'simulated' | 'real';
-
-/** Leading zero bits per block in real PoW mode: about 4,096 hashes each, quick enough to mine inside the event loop. */
-export const REAL_POW_BITS = 12;
+export { ATTACK_PAYMENT, type PowMode, REAL_POW_BITS, attackerKey, genesisFor, merchantAddress, minerAddress } from '../experiments';
 
 export const MAX_NODES = 12;
 
@@ -107,9 +89,6 @@ export const DEFAULT_ATTACK: Readonly<AttackConfig> = { kind: 'double-spend', al
  * only immutable while no one holds more than half of the hash power.
  */
 export const PRESET_51: Readonly<AttackConfig> = { kind: 'double-spend', alpha: 0.55, confirmations: 6, maxDeficit: Infinity, gamma: 0 };
-
-/** What the double spend pays the merchant. The attacker starts with the 50-coin genesis reward. */
-export const ATTACK_PAYMENT = 10 * COIN;
 
 export type ActiveAttack =
   | { kind: 'double-spend'; config: Readonly<AttackConfig>; node: NodeId; strategy: DoubleSpendAttacker }
@@ -648,51 +627,4 @@ function blocksOffMainChain(chain: Chain, hash: string): number {
   let depth = 0;
   for (let e = chain.tree.get(hash); e && !chain.isOnMainChain(e.hash); e = e.parent === null ? undefined : chain.tree.get(e.parent)) depth++;
   return depth;
-}
-
-// ---------------------------------------------------------------------------
-// Deterministic keys and genesis blocks
-// ---------------------------------------------------------------------------
-
-const addressCache = new Map<string, Address>();
-
-/** Private key = sha256(label), so a node's reward address only depends on its id and runs replay exactly. */
-function addressFor(label: string): Address {
-  let a = addressCache.get(label);
-  if (!a) {
-    a = keyPairFromPrivate(sha256(utf8ToBytes(label))).address;
-    addressCache.set(label, a);
-  }
-  return a;
-}
-
-export function minerAddress(id: NodeId): Address {
-  return addressFor(`playground node ${id}`);
-}
-
-let attacker: KeyPair | null = null;
-
-/** The attacker's wallet: it signs the double spend and collects the attacker's rewards. */
-export function attackerKey(): KeyPair {
-  return (attacker ??= keyPairFromPrivate(sha256(utf8ToBytes('playground attacker'))));
-}
-
-/** Who the double spend pays, and then takes back. */
-export function merchantAddress(): Address {
-  return addressFor('playground merchant');
-}
-
-const genesisCache = new Map<PowMode, Block>();
-
-/** The shared first block. Its target sets the network's difficulty, and so the PoW mode. */
-export function genesisFor(pow: PowMode): Block {
-  let g = genesisCache.get(pow);
-  if (!g) {
-    const target = pow === 'real' ? targetFromLeadingZeroBits(REAL_POW_BITS) : SIMULATED_POW_TARGET;
-    // The genesis reward is the attacker's starting balance (see the top of this file).
-    const t = assembleBlock({ prevHash: ZERO_HASH, height: 0, timestamp: 0, target, minerAddress: attackerKey().address, txs: [], fees: 0 });
-    g = { header: mineChunk(t.header, Number.MAX_SAFE_INTEGER).header, txs: t.txs };
-    genesisCache.set(pow, g);
-  }
-  return g;
 }

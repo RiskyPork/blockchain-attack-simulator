@@ -5,6 +5,7 @@
  */
 import { mountAttacks } from './attacks';
 import { mountChainTree } from './chaintree';
+import { mountExperiments } from './experiments';
 import { mountExplorer } from './explorer';
 import { mountNetwork } from './network';
 import { App } from './state';
@@ -24,7 +25,7 @@ const TABS: Tab[] = [
   { id: 'network', label: 'Network', sprint: 2, blurb: 'Nodes, hash power, link latency and block propagation.', mount: mountNetwork },
   { id: 'chain', label: 'Chain tree', sprint: 2, blurb: 'Every block including stale forks; the most-work chain is highlighted.', mount: mountChainTree },
   { id: 'attacks', label: 'Attacks', sprint: 3, blurb: '51% / double-spend and selfish mining, live.', mount: mountAttacks },
-  { id: 'experiments', label: 'Experiments', sprint: 4, blurb: 'Batch trials: simulated success rate vs. theory.' },
+  { id: 'experiments', label: 'Experiments', sprint: 4, blurb: 'Batch trials: simulated success rate vs. theory.', mount: mountExperiments },
 ];
 
 export function mountShell(root: HTMLElement): void {

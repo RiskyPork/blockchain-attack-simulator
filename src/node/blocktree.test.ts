@@ -276,4 +276,20 @@ describe('BlockTree: bestTip (fork choice)', () => {
     t.add(a);
     expect(t.bestTip()!.hash).toBe(h(b));
   });
+
+  it('falls back to the best remaining tip when the best branch is marked invalid', () => {
+    const t = new BlockTree(accept);
+    const g = blockOn(null);
+    const a = blockOn(g);
+    const b = blockOn(g);
+    const [long1, long2] = chainOn(g, 2);
+    for (const x of [g, a, b, long1, long2]) t.add(x);
+    expect(t.bestTip()!.hash).toBe(h(long2));
+    const bad: BlockError = { code: 'bad-merkle-root' };
+    t.markInvalid(h(long1), bad);
+    expect(t.bestTip()!.hash).toBe(h(a)); // a and b tie; a joined first
+    t.markInvalid(h(a), bad);
+    t.markInvalid(h(b), bad);
+    expect(t.bestTip()!.hash).toBe(h(g));
+  });
 });

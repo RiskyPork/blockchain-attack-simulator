@@ -208,6 +208,22 @@ describe('SelfishMiner: state machine (S3-4)', () => {
     expect(selfish.counters.discarded).toBe(1);
     expect(mainChainBy(chain)).toBe('HH');
   });
+
+  it('releaseAll publishes every withheld block at the end of a run, and every node takes the longer branch', () => {
+    const { net, S, H, all, selfish, status } = setup();
+    mineBy(net, H, 1);
+    mineBy(net, S, 3);
+    const hidden = [...selfish.withheld];
+    expect(hidden).toHaveLength(3);
+    expect(selfish.releaseAll(net.mining.nodeContext(S))).toBe(3);
+    settle(net);
+    expect(status()).toEqual({ state: '0', lead: 0, withheld: 0 });
+    for (const chain of all) {
+      expect(mainChainBy(chain)).toBe('HSSS');
+      for (const b of hidden) expect(chain.isOnMainChain(hashOf(b))).toBe(true);
+    }
+    expect(selfish.releaseAll(net.mining.nodeContext(S))).toBe(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

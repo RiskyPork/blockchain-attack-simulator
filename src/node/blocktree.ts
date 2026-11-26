@@ -63,6 +63,13 @@ export class BlockTree {
   /** Known-invalid blocks, so a resubmission is rejected with the same reason without re-checking. */
   private readonly invalid = new Map<string, InvalidReason>();
   private nextSeq = 0;
+  /**
+   * The most-work tip, kept up to date as blocks are placed: scanning every
+   * leaf on every block gets slow once a long run has piled up stale
+   * branches. A new entry takes over only with strictly more work, so on a tie
+   * the older one stays. Only removing blocks (markInvalid) needs a rescan.
+   */
+  private best: TreeEntry | undefined;
 
   constructor(private readonly check: StructureCheck) {}
 
@@ -113,12 +120,16 @@ export class BlockTree {
    * between equal branches; selfish mining depends on this rule.
    */
   bestTip(): TreeEntry | undefined {
+    return this.best;
+  }
+
+  private rescanBest(): void {
     let best: TreeEntry | undefined;
     for (const hash of this.leaves) {
       const e = this.nodes.get(hash)!;
       if (!best || e.chainWork > best.chainWork || (e.chainWork === best.chainWork && e.seq < best.seq)) best = e;
     }
-    return best;
+    this.best = best;
   }
 
   /**
@@ -172,6 +183,7 @@ export class BlockTree {
       this.children.delete(h);
       this.dropOrphansOf(h);
     }
+    if (this.best && !this.nodes.has(this.best.hash)) this.rescanBest();
   }
 
   /** Structure-check a block whose parent is in the tree (or is genesis) and add it. */
@@ -194,6 +206,7 @@ export class BlockTree {
     };
     this.nodes.set(hash, entry);
     this.leaves.add(hash);
+    if (!this.best || entry.chainWork > this.best.chainWork) this.best = entry;
     if (parentHash !== null) {
       this.children.set(parentHash, [...(this.children.get(parentHash) ?? []), hash]);
       this.leaves.delete(parentHash);
