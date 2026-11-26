@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1000" viewBox="0 0 1800 1000" font-family="Arial, Helvetica, 'Segoe UI', sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555555"/>
+    </marker>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="1800" height="1000" fill="#ffffff"/>
+
+  <!-- title -->
+  <text x="900" y="54" text-anchor="middle" font-size="40" font-weight="700" fill="#1a1a1a">Blockchain Attack Simulator: module architecture</text>
+  <text x="900" y="90" text-anchor="middle" font-size="24" fill="#555555">Arrows point down: each layer depends only on the layers below it.</text>
+
+  <!-- left bracket and vertical label -->
+  <path d="M118,118 H106 V962 H118" fill="none" stroke="#666666" stroke-width="2"/>
+  <text transform="translate(86,540) rotate(-90)" text-anchor="middle" font-size="24" fill="#444444">Vite + TypeScript, runs entirely in the browser (GitHub Pages)</text>
+
+  <!-- layer 1: ui -->
+  <rect x="130" y="118" width="1290" height="96" rx="12" fill="#eaf2fb" stroke="#2b6cb0" stroke-width="2.5"/>
+  <text x="152" y="156" font-size="32" font-weight="700" fill="#2b6cb0">ui/</text>
+  <text x="152" y="178" font-size="22" fill="#555555">browser UI,</text>
+  <text x="152" y="200" font-size="22" fill="#555555">no consensus logic</text>
+  <text x="460" y="156" font-size="26" fill="#1f1f1f">Tabs: Wallets · Explorer · Network · Chain tree · Attacks · Experiments</text>
+  <text x="460" y="190" font-size="26" fill="#1f1f1f">Playground: the live network the tabs share</text>
+
+  <line x1="775" y1="217" x2="775" y2="251" stroke="#555555" stroke-width="2.5" marker-end="url(#arr)"/>
+
+  <!-- layer 2: experiments -->
+  <rect x="130" y="254" width="1290" height="96" rx="12" fill="#e7f5f3" stroke="#17807a" stroke-width="2.5"/>
+  <text x="152" y="292" font-size="32" font-weight="700" fill="#17807a">experiments/</text>
+  <text x="460" y="292" font-size="26" fill="#1f1f1f">batch runner (runs in a Web Worker) · theory (Nakamoto §11, Eyal &amp; Sirer 2014)</text>
+  <text x="460" y="326" font-size="26" fill="#1f1f1f">metrics · stats (95% CIs) · CSV/JSON export</text>
+
+  <line x1="775" y1="353" x2="775" y2="387" stroke="#555555" stroke-width="2.5" marker-end="url(#arr)"/>
+
+  <!-- layer 3: strategies -->
+  <rect x="130" y="390" width="1290" height="96" rx="12" fill="#eaf6ec" stroke="#3b8a4b" stroke-width="2.5"/>
+  <text x="152" y="447" font-size="32" font-weight="700" fill="#3b8a4b">strategies/</text>
+  <text x="460" y="447" font-size="26" fill="#1f1f1f">MinerStrategy interface → HonestMiner · DoubleSpendAttacker · SelfishMiner</text>
+
+  <line x1="775" y1="489" x2="775" y2="523" stroke="#555555" stroke-width="2.5" marker-end="url(#arr)"/>
+
+  <!-- layer 4: network -->
+  <rect x="130" y="526" width="1290" height="130" rx="12" fill="#fbf3e3" stroke="#b7791f" stroke-width="2.5"/>
+  <text x="152" y="564" font-size="32" font-weight="700" fill="#b7791f">network/</text>
+  <text x="460" y="564" font-size="26" fill="#1f1f1f">discrete-event Simulator + seeded RNG</text>
+  <text x="460" y="598" font-size="26" fill="#1f1f1f">Network (peer links, latency + jitter, flooding gossip)</text>
+  <text x="460" y="632" font-size="26" fill="#1f1f1f">Mining (exponential block times, winner ∝ hash share)</text>
+
+  <line x1="775" y1="659" x2="775" y2="693" stroke="#555555" stroke-width="2.5" marker-end="url(#arr)"/>
+
+  <!-- layer 5: node -->
+  <rect x="130" y="696" width="1290" height="96" rx="12" fill="#f7edf4" stroke="#97407a" stroke-width="2.5"/>
+  <text x="152" y="734" font-size="32" font-weight="700" fill="#97407a">node/</text>
+  <text x="460" y="734" font-size="26" fill="#1f1f1f">Chain (block tree incl. stale blocks, orphan pool, most-work fork choice,</text>
+  <text x="460" y="768" font-size="26" fill="#1f1f1f">reorg, mempool) · wallet</text>
+
+  <line x1="775" y1="795" x2="775" y2="829" stroke="#555555" stroke-width="2.5" marker-end="url(#arr)"/>
+
+  <!-- layer 6: core -->
+  <rect x="130" y="832" width="1290" height="130" rx="12" fill="#eceff4" stroke="#3d4b5e" stroke-width="2.5"/>
+  <text x="152" y="870" font-size="32" font-weight="700" fill="#3d4b5e">core/</text>
+  <text x="460" y="870" font-size="26" fill="#1f1f1f">SHA-256 / HASH160 · secp256k1 keys + Base58Check addresses</text>
+  <text x="460" y="904" font-size="26" fill="#1f1f1f">UTXO transactions · Merkle root · block header + PoW miner</text>
+  <text x="460" y="938" font-size="26" fill="#1f1f1f">UTXO set (apply/undo) · validation rules</text>
+
+  <!-- external dependency, to the right of core/ -->
+  <line x1="1421" y1="897" x2="1477" y2="897" stroke="#555555" stroke-width="2.5" marker-end="url(#arr)"/>
+  <rect x="1480" y="845" width="270" height="104" rx="10" fill="#ffffff" stroke="#777777" stroke-width="2" stroke-dasharray="10 7"/>
+  <text x="1615" y="876" text-anchor="middle" font-size="24" fill="#333333">external libraries:</text>
+  <text x="1615" y="905" text-anchor="middle" font-size="24" fill="#333333">@noble/hashes,</text>
+  <text x="1615" y="934" text-anchor="middle" font-size="24" fill="#333333">@noble/secp256k1</text>
+</svg>
