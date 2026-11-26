@@ -68,7 +68,7 @@ const gapsOf = (times: number[], start = 0) => times.map((t, i) => t - (i === 0 
 // When blocks are found
 // ---------------------------------------------------------------------------
 
-describe('Mining: block timing (S2-5)', () => {
+describe('Mining: block timing', () => {
   it('schedules nothing until some node has hash power', () => {
     const { net, ids } = makeNet(2);
     expect(net.sim.pending).toBe(0);
@@ -114,7 +114,7 @@ describe('Mining: block timing (S2-5)', () => {
 // Who finds them
 // ---------------------------------------------------------------------------
 
-describe('Mining: winner by hash share (S2-5)', () => {
+describe('Mining: winner by hash share', () => {
   it('picks each winner with probability equal to its hash share', () => {
     // No links, so each node just extends its own chain and the counts are easy to read.
     const { net, ids } = makeNet(4);
@@ -226,7 +226,7 @@ describe('Mining: winner by hash share (S2-5)', () => {
 // Simulated vs real PoW, and what a strategy is given
 // ---------------------------------------------------------------------------
 
-describe('Mining: simulated and real PoW (S2-5)', () => {
+describe('Mining: simulated and real PoW', () => {
   it('simulated PoW: the first nonce wins, blocks are marked, and every node still validates them', () => {
     const { net, ids } = makeNet(3);
     net.connect(ids[0], ids[1], { latency: 1 });
@@ -312,7 +312,7 @@ describe('Mining: simulated and real PoW (S2-5)', () => {
 // Reproducibility
 // ---------------------------------------------------------------------------
 
-describe('Mining: reproducibility (S2-5)', () => {
+describe('Mining: reproducibility', () => {
   /** A short run with forks and jitter, summarised as one line per fired event. */
   function run(seed: number): string[] {
     const { net, ids } = makeNet(3, { seed, recordLog: true, blockInterval: 10 });
@@ -339,7 +339,7 @@ describe('Mining: reproducibility (S2-5)', () => {
 // Strategy hooks
 // ---------------------------------------------------------------------------
 
-describe('Mining: strategy hooks (S3-1)', () => {
+describe('Mining: strategy hooks', () => {
   /** With simulated PoW the first nonce always works. */
   const solved = (t: Block): Block => ({ header: mineChunk(t.header, 1).header, txs: t.txs });
 

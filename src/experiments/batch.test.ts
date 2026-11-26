@@ -22,7 +22,7 @@ const sm = (o: Partial<SelfishExperiment> = {}): SelfishExperiment => ({
   ...DEFAULT_SELFISH, trials: 2, alphas: [0.3], gammas: [0, 1], blocks: 60, ...o,
 });
 
-describe('runDoubleSpendTrial (S4-1)', () => {
+describe('runDoubleSpendTrial', () => {
   it('is a pure function of its seed and settings', () => {
     for (const seed of [1, 2, 3]) {
       const o = { q: 0.4, confirmations: 2, maxDeficit: 5, seed };
@@ -57,7 +57,7 @@ describe('runDoubleSpendTrial (S4-1)', () => {
   }, 60_000);
 });
 
-describe('runSelfishTrial (S4-1)', () => {
+describe('runSelfishTrial', () => {
   it('is a pure function of its seed and settings', () => {
     const o = { alpha: 0.35, gamma: 0.5, blocks: 200, seed: 4 };
     expect(runSelfishTrial(o)).toEqual(runSelfishTrial(o));
@@ -73,7 +73,7 @@ describe('runSelfishTrial (S4-1)', () => {
   }, 30_000);
 });
 
-describe('ExperimentRun (S4-1)', () => {
+describe('ExperimentRun', () => {
   it('plans one cell per grid point, z (or γ) outer, with theory alongside', () => {
     const r = new ExperimentRun(ds()).result();
     expect(r.total).toBe(4 * 3);
@@ -176,7 +176,7 @@ describe('stats', () => {
   });
 });
 
-describe('export (S4-4)', () => {
+describe('export', () => {
   const r = new ExperimentRun(ds({ trials: 2 })).runAll();
 
   it('CSV: a header and one row per cell, with the seed and every parameter', () => {

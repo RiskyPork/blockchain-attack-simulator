@@ -75,7 +75,7 @@ function mineBy(net: Network, id: NodeId, n: number): void {
 // The state machine, one transition at a time (Eyal & Sirer, Algorithm 1)
 // ---------------------------------------------------------------------------
 
-describe('SelfishMiner: state machine (S3-4)', () => {
+describe('SelfishMiner: state machine', () => {
   it('state 0 → 1 → 2: keeps the blocks it finds to itself', () => {
     const { net, S, all, selfish, status } = setup();
     expect(status()).toEqual({ state: '0', lead: 0, withheld: 0 });
@@ -230,7 +230,7 @@ describe('SelfishMiner: state machine (S3-4)', () => {
 // γ: which side of a tie honest miners build on
 // ---------------------------------------------------------------------------
 
-describe('HonestMiner tie-break, the γ of selfish mining (S3-4)', () => {
+describe('HonestMiner tie-break, the γ of selfish mining', () => {
   const block = (payTo: KeyPair, t: number) =>
     solve(assembleBlock({ prevHash: hexToBytes(hashOf(GENESIS)), height: 1, timestamp: t, target: SIMULATED_POW_TARGET, minerAddress: payTo.address, txs: [], fees: 0 }));
   const selfishBlock = block(selfishKey, 1);
@@ -286,7 +286,7 @@ describe('HonestMiner tie-break, the γ of selfish mining (S3-4)', () => {
 // Revenue against the paper
 // ---------------------------------------------------------------------------
 
-describe('SelfishMiner revenue matches Eyal & Sirer (S3-4, S3-6)', () => {
+describe('SelfishMiner revenue matches Eyal & Sirer', () => {
   /**
    * A long run with no latency: the honest side acts as one miner, as in the
    * paper, and ties are split by γ alone. Returns the selfish miner's share

@@ -35,7 +35,7 @@ describe('form parsing', () => {
   });
 });
 
-describe('double-spend chart (S4-3)', () => {
+describe('double-spend chart', () => {
   const e = { ...DEFAULT_DOUBLE_SPEND, trials: 2, qs: [0.2, 0.45], zs: [3, 1] };
 
   it('before a run: one theory curve per z, light to dark, and no points', () => {
@@ -68,7 +68,7 @@ describe('double-spend chart (S4-3)', () => {
   });
 });
 
-describe('selfish-mining chart (S4-3)', () => {
+describe('selfish-mining chart', () => {
   const e = { ...DEFAULT_SELFISH, trials: 2, alphas: [0.3, 0.4], gammas: [0.5, 0], blocks: 100 };
 
   it('has the fair-share line, one curve per γ, and each break-even point ringed', () => {

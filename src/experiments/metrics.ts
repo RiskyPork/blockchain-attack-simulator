@@ -17,7 +17,6 @@
  * once the run has settled (no blocks on the wire, nothing withheld), or
  * recent blocks still in flight or kept private count as off the chain.
  */
-import { blockHashHex } from '../core';
 import type { MinedBlock, Network, NodeId } from '../network';
 import type { Chain } from '../node';
 
@@ -45,20 +44,22 @@ export interface ChainMetrics {
  * `chain`'s main chain.
  */
 export function chainMetrics(chain: Chain, mined: readonly MinedBlock[]): ChainMetrics {
-  const main = new Set(chain.blocks.slice(1).map((b) => blockHashHex(b.header)));
+  // The live Attacks tab calls this on every redraw, so it asks the chain
+  // (a map lookup) rather than hashing every main-chain block each time.
   const byMiner = new Map<NodeId, MinerTally>();
   let onMain = 0;
   for (const rec of mined) {
     let t = byMiner.get(rec.miner);
     if (!t) byMiner.set(rec.miner, (t = { found: 0, onMain: 0 }));
     t.found++;
-    if (main.has(rec.hash)) {
+    if (chain.isOnMainChain(rec.hash)) {
       t.onMain++;
       onMain++;
     }
   }
   const found = mined.length;
-  return { mainBlocks: main.size, found, stale: found - onMain, staleRate: found > 0 ? (found - onMain) / found : 0, byMiner };
+  const mainBlocks = Math.max(0, chain.height);
+  return { mainBlocks, found, stale: found - onMain, staleRate: found > 0 ? (found - onMain) / found : 0, byMiner };
 }
 
 /** Fraction of main-chain blocks found by `miners`. 0 while the main chain holds only genesis. */

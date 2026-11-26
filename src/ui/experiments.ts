@@ -42,7 +42,7 @@ import {
   stepRange,
   uniqueSorted,
 } from './experiment-view';
-import { banner, esc } from './format';
+import { banner, esc, fmtInt } from './format';
 import type { App } from './state';
 
 export function mountExperiments(root: HTMLElement, _app: App): void {
@@ -251,7 +251,7 @@ function mountPanel<E extends Experiment>(card: HTMLElement, readNetwork: () => 
     chartBox.querySelector('.chart-scroll')?.remove();
     chartBox.insertAdjacentHTML('afterbegin', `<div class="chart-scroll">${chartSvg(c)}</div>`);
     ref('caption').textContent = result
-      ? `${result.done < result.total ? `Partial: ${result.done} of ${result.total} trials. ` : ''}${describeSettings(result.experiment)}.`
+      ? `${result.done < result.total ? `Partial: ${fmtInt(result.done)} of ${fmtInt(result.total)} trials. ` : ''}${describeSettings(result.experiment)}.`
       : `Theory only, for ${describeSettings(e)}. Press Run to add simulated points.`;
     ref('table').innerHTML = result ? spec.table(result) : '<p class="muted small">Run the experiment to fill the table.</p>';
     const has = result !== null && result.done > 0;

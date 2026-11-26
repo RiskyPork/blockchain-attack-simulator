@@ -10,7 +10,7 @@ Interactive browser simulator for Proof-of-Work consensus and blockchain attacks
 A browser-only simulation of a small Bitcoin-style PoW network. Nodes mine, broadcast blocks with network delay, and resolve forks by the most-work chain rule. You set each node's hash power and latency, launch a **51% / double-spend** or **selfish-mining** attack, and watch the chain react. Experiment mode runs many trials and compares attack success with theory (Nakamoto 2008 §11; Eyal & Sirer 2014).
 
 ## Getting started
-Requires Node.js ≥ 20.19.
+Requires Node.js 22.12 or newer (Vitest 5 needs it; CI uses Node 24).
 
 ```bash
 npm install

@@ -45,7 +45,7 @@ describe('attackHashPowers', () => {
   });
 });
 
-describe('Playground attacks: setup (S3-5)', () => {
+describe('Playground attacks: setup', () => {
   it('has no attack until one is launched', () => {
     const pg = new Playground();
     expect(pg.attack).toBeNull();
@@ -111,7 +111,7 @@ describe('Playground attacks: setup (S3-5)', () => {
   });
 });
 
-describe('Playground attacks: outcomes (S3-3, S3-5)', () => {
+describe('Playground attacks: outcomes', () => {
   it('51% preset: the double spend succeeds, and every node undoes the blocks that held the payment', () => {
     const pg = new Playground();
     pg.launchAttack(PRESET_51);

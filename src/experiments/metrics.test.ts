@@ -43,7 +43,7 @@ function forkedPair() {
   return { net, A, B, reorgs };
 }
 
-describe('chainMetrics and revenueShare (S3-6)', () => {
+describe('chainMetrics and revenueShare', () => {
   it('counts blocks found against the main chain, per miner', () => {
     const { net, A, B } = forkedPair();
     const m = chainMetrics(net.node(B).chain, net.mining.minedBlocks());
@@ -65,7 +65,7 @@ describe('chainMetrics and revenueShare (S3-6)', () => {
   });
 });
 
-describe('ReorgTracker (S3-6)', () => {
+describe('ReorgTracker', () => {
   it('records each node that drops blocks from its main chain, with the depth', () => {
     const { reorgs } = forkedPair();
     // Only B reorgs: A never left its own branch.

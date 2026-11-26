@@ -94,7 +94,7 @@ function threeMiners(latency: number, blocks: number, seed = 3) {
 // The mining steps, one block at a time
 // ---------------------------------------------------------------------------
 
-describe('HonestMiner: creating a block (S2-6)', () => {
+describe('HonestMiner: creating a block', () => {
   it("builds on its node's current tip, pays itself, and publishes at once", () => {
     const chain = newChain();
     const first = contextOn(chain, 1_000);
@@ -142,7 +142,7 @@ describe('HonestMiner: creating a block (S2-6)', () => {
 // Honest miners on the network
 // ---------------------------------------------------------------------------
 
-describe('HonestMiner on the network (S2-6)', () => {
+describe('HonestMiner on the network', () => {
   it("spreads a lone miner's blocks to every node", () => {
     const net = new Network({ seed: 1, genesis: GENESIS, blockInterval: 10 });
     const ids = [net.addNode(), net.addNode(), net.addNode()];

@@ -1,7 +1,7 @@
 /**
- * ui/: the app shell. Each tab maps to one feature area; panels are filled in
- * as features land. UI code only reads simulator
- * state and dispatches user actions; it holds no consensus logic.
+ * ui/: the app shell. Each tab maps to one feature area and mounts its panel.
+ * UI code only reads simulator state and dispatches user actions; it holds no
+ * consensus logic.
  */
 import { mountAttacks } from './attacks';
 import { mountChainTree } from './chaintree';
@@ -14,18 +14,16 @@ import { mountWallets } from './wallets';
 interface Tab {
   id: string;
   label: string;
-  sprint: number;
-  blurb: string;
-  mount?: (root: HTMLElement, app: App) => void;
+  mount: (root: HTMLElement, app: App) => void;
 }
 
 const TABS: Tab[] = [
-  { id: 'wallets', label: 'Wallets', sprint: 1, blurb: 'secp256k1 key pairs, Base58Check addresses, signed transactions.', mount: mountWallets },
-  { id: 'explorer', label: 'Explorer', sprint: 1, blurb: 'Blocks, transactions, Merkle roots and real SHA-256 proof-of-work.', mount: mountExplorer },
-  { id: 'network', label: 'Network', sprint: 2, blurb: 'Nodes, hash power, link latency and block propagation.', mount: mountNetwork },
-  { id: 'chain', label: 'Chain tree', sprint: 2, blurb: 'Every block including stale forks; the most-work chain is highlighted.', mount: mountChainTree },
-  { id: 'attacks', label: 'Attacks', sprint: 3, blurb: '51% / double-spend and selfish mining, live.', mount: mountAttacks },
-  { id: 'experiments', label: 'Experiments', sprint: 4, blurb: 'Batch trials: simulated success rate vs. theory.', mount: mountExperiments },
+  { id: 'wallets', label: 'Wallets', mount: mountWallets },
+  { id: 'explorer', label: 'Explorer', mount: mountExplorer },
+  { id: 'network', label: 'Network', mount: mountNetwork },
+  { id: 'chain', label: 'Chain tree', mount: mountChainTree },
+  { id: 'attacks', label: 'Attacks', mount: mountAttacks },
+  { id: 'experiments', label: 'Experiments', mount: mountExperiments },
 ];
 
 export function mountShell(root: HTMLElement): void {
@@ -46,8 +44,7 @@ export function mountShell(root: HTMLElement): void {
   // mining job or a half-filled form) survives switching tabs.
   for (const tab of TABS) {
     const panel = root.querySelector<HTMLElement>(`#panel-${tab.id}`)!;
-    if (tab.mount) tab.mount(panel, app);
-    else panel.innerHTML = `<h2>${tab.label}</h2><p>${tab.blurb}</p><p class="todo">Planned for Sprint ${tab.sprint}.</p>`;
+    tab.mount(panel, app);
   }
 
   const buttons = root.querySelectorAll<HTMLButtonElement>('[data-tab]');

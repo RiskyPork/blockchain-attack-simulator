@@ -306,7 +306,12 @@ function tilesHtml(r: AttackReadout | null): string {
     tile('Attacker hash share', pct(r.alpha), 'its fair share of blocks'),
     tile('Attacker revenue share', r.mainBlocks ? pct(r.revenue) : '–', `of ${r.mainBlocks} main-chain blocks, as ${nodeLabel(r.observer)} sees it`),
   ];
-  if (r.kind === 'selfish') tiles.push(tile('Theory', pct(r.theory), `Eyal & Sirer, α = ${pct(r.alpha, 0)}, γ = ${r.gamma.toFixed(2)}`));
+  if (r.kind === 'selfish') {
+    const note = r.alpha >= 0.5
+      ? 'with a majority its secret branch is never caught, so in the end every block is its own'
+      : `Eyal & Sirer, α = ${pct(r.alpha, 0)}, γ = ${r.gamma.toFixed(2)}`;
+    tiles.push(tile('Theory', pct(r.theory), note));
+  }
   tiles.push(tile('Stale rate', pct(r.staleRate), 'of all blocks found, off the main chain'));
   return tiles.join('');
 }

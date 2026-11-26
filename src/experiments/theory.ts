@@ -131,10 +131,20 @@ export function doubleSpendSuccess(q: number, k: number, maxDeficit = Infinity):
  *
  * Honest mining earns α. Selfish mining earns more once α passes
  * selfishThreshold(γ).
+ *
+ * The formula holds for a minority, α < 1/2: it comes from the long-run
+ * distribution of the private lead, which only exists while the lead keeps
+ * falling back to 0. With α ≥ 1/2 the lead drifts upwards instead, so from
+ * some point on the private branch is never caught and every block is the
+ * selfish miner's: the share tends to 1. Past 1/2 the expression itself
+ * stops meaning anything (its denominator reaches 0 near α = 0.555 and
+ * then turns negative), so a majority gets 1. At α = 1/2 the formula also
+ * gives exactly 1, so the two pieces meet.
  */
 export function selfishRevenue(alpha: number, gamma: number): number {
   checkShare(alpha, 'alpha');
   checkShare(gamma, 'gamma');
+  if (alpha >= 0.5) return 1;
   const a = alpha;
   return (a * (1 - a) ** 2 * (4 * a + gamma * (1 - 2 * a)) - a ** 3) / (1 - a * (1 + (2 - a) * a));
 }

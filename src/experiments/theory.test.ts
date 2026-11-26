@@ -148,4 +148,24 @@ describe('selfish mining (Eyal & Sirer 2014)', () => {
     expect(selfishRevenue(0.4, 0.5)).toBeCloseTo(0.1808 / 0.344, 10);
     expect(selfishRevenue(0, 0)).toBe(0);
   });
+
+  it('is a share: it rises from 0 to 1 as α goes from 0 to 1/2, for every γ', () => {
+    for (const gamma of [0, 0.25, 0.5, 0.75, 1]) {
+      let prev = 0;
+      for (let i = 0; i <= 100; i++) {
+        const r = selfishRevenue(i / 200, gamma);
+        expect(r).toBeGreaterThanOrEqual(prev - 1e-12);
+        expect(r).toBeLessThanOrEqual(1);
+        prev = r;
+      }
+      expect(selfishRevenue(0.4999, gamma)).toBeCloseTo(1, 2);
+    }
+  });
+
+  it('is 1 for a majority, where the formula no longer applies (it would give 691% at α = 0.55, then negative values)', () => {
+    for (const alpha of [0.5, 0.52, 0.55, 0.56, 0.6, 0.75, 0.95, 1]) {
+      expect(selfishRevenue(alpha, 0)).toBe(1);
+      expect(selfishRevenue(alpha, 0.5)).toBe(1);
+    }
+  });
 });

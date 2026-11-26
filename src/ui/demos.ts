@@ -157,7 +157,9 @@ export const DEMOS: Demo[] = [
       const { wallet, coin } = funded(app);
       const to = someoneElse(app, wallet);
       const tx = buildPayment(app.chain.spendableUtxos(), wallet.key, to.key.address, COIN, 0);
-      const forged = Math.min(coin.output.value, 10 * COIN);
+      // Up to the whole coin, so the signature is the only thing wrong, but always
+      // more than the 1 coin signed for: an unchanged amount would still verify.
+      const forged = Math.max(Math.min(coin.output.value, 10 * COIN), 2 * COIN);
       const tampered = { ...tx, outputs: [{ ...tx.outputs[0], value: forged }, ...tx.outputs.slice(1)] };
       return txOutcome(
         `${wallet.name} signs "pay ${to.name} 1 coin"; someone then changes the amount to ${fmtCoins(forged)} without re-signing.`,

@@ -89,7 +89,7 @@ function mineBy(net: Network, id: NodeId, n: number): void {
 // Launch
 // ---------------------------------------------------------------------------
 
-describe('DoubleSpendAttacker: launch (S3-2)', () => {
+describe('DoubleSpendAttacker: launch', () => {
   it('broadcasts the payment and keeps a conflicting tx that pays itself', () => {
     const { net, H, all, attacker, launch } = setup();
     launch();
@@ -150,7 +150,7 @@ describe('DoubleSpendAttacker: launch (S3-2)', () => {
 // The race, one block at a time
 // ---------------------------------------------------------------------------
 
-describe('DoubleSpendAttacker: the race (S3-2)', () => {
+describe('DoubleSpendAttacker: the race', () => {
   it('withholds its branch through a tie, then releases it with more work and reverses the payment', () => {
     const { net, A, H, M, all, attacker, launch } = setup();
     launch();
@@ -268,7 +268,7 @@ describe('DoubleSpendAttacker: the race (S3-2)', () => {
 // Hash power decides
 // ---------------------------------------------------------------------------
 
-describe('DoubleSpendAttacker: hash power decides (S3-2, S3-3)', () => {
+describe('DoubleSpendAttacker: hash power decides', () => {
   /**
    * One attack from launch to release or give-up, with both sides mining
    * freely. Zero latency, so no honest block is ever on the wire when the

@@ -387,7 +387,7 @@ describe('Network reproducibility', () => {
 // Transactions
 // ---------------------------------------------------------------------------
 
-describe('Network transactions (S3-1)', () => {
+describe('Network transactions', () => {
   /** minerA owns the genesis coinbase, its only coin. */
   const payFromA = (net: Network, to: KeyPair, amount = COIN) =>
     buildPayment(net.node(0).chain.confirmedUtxos(), minerA, to.address, amount, 1_000);
