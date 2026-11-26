@@ -119,7 +119,7 @@ The brief's priority order decides what gets cut. If a sprint runs over, drop fr
 | S5-1 | **README & usage guide** | 2 | Live link, screenshots, how to run, architecture diagram, module map, how to reproduce the experiment charts |
 | S5-2 | **Report (1–2 pages)** | 3 | Architecture, key algorithms, simulated-vs-theory results, discussion using the blockchain triangle (decentralization / security / scalability), GitHub link |
 | S5-3 | **Demo video (5–10 min)** | 5 | Script → record (face + voice, ≥ 1024×768, .mp4): intro → core → network/forks → attacks → experiments → code tour → wrap-up. Reuse the sprint-review clips. |
-| S5-4 | **Submit** | 1 | Make the repo public (the brief requires it), tag `v1.0`, check the live link in a private window, zip the program (no `node_modules`), upload everything |
+| S5-4 | **Submit** | 1 | Decide repo visibility so graders can open the GitHub link (the guide requires a production GitHub link and a program that is "runnable and accessible"; it does not say public), tag `v1.0`, check the live link, zip the program (no `node_modules`), upload everything |
 
 ---
 
